@@ -1,0 +1,30 @@
+// File: models/FlightSession.js
+
+const mongoose = require('mongoose');
+
+const flightSessionSchema = new mongoose.Schema({
+    deviceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Device', // Liên kết tới model Device
+        required: true
+    },
+    startTime: {
+        type: Date,
+        required: true
+    },
+    endTime: {
+        type: Date
+    },
+    durationInSeconds: {
+        type: Number,
+        default: 0
+    },
+    // Lưu lại một mảng các tọa độ [lat, lng]
+    path: [{
+        lat: Number,
+        lng: Number,
+        _id: false // Không cần _id cho mỗi điểm tọa độ
+    }]
+}, { timestamps: true });
+
+module.exports = mongoose.model('FlightSession', flightSessionSchema);

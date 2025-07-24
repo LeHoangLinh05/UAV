@@ -1,0 +1,84 @@
+/* Reset & Base */
+body, html, #root {
+    height: 100%;
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+/* Wrapper chính */
+.app-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Video nền */
+.background-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -1;
+}
+
+/* Lớp phủ nội dung */
+.form-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.5); /* nền tối mờ */
+    backdrop-filter: blur(8px);
+    color: #fff;
+    padding: 30px 40px;
+    border-radius: 12px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    z-index: 1;
+    text-align: center;
+}
+
+/* Form cấu trúc */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+form input,
+form select,
+form button {
+    padding: 15px;
+    font-size: 1rem;
+    border-radius: 6px;
+    border: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+form button {
+    background-color: #2196f3;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+form button:hover {
+    background-color: #1976d2;
+}
+
+/* Nút chuyển đổi giữa đăng nhập/đăng ký */
+.toggle-button {
+    background: none;
+    color: #1e90ff;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 0.95rem;
+    margin-top: 10px;
+}
