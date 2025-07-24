@@ -5,6 +5,7 @@ const fs = require('fs');
 const router = express.Router();
 const Device = require('../models/Device');
 const FlightSession = require('../models/FlightSession');
+const axios = require('axios');
 
 // Lưu ảnh vào thư mục "uploads/"
 const storage = multer.diskStorage({
@@ -19,6 +20,50 @@ const storage = multer.diskStorage({
     }
 });
 const upload = multer({ storage });
+
+const getAddressFromCoordinates = async (lat, lng) => {
+    try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=vi`;
+        const response = await axios.get(url, {
+            headers: { 'User-Agent': 'UAV-Management-App/1.0 (your-email@example.com)' }
+        });
+
+        const data = response.data;
+        if (data && data.address) {
+            const addr = data.address;
+
+            // Xây dựng chuỗi địa chỉ theo thứ tự ưu tiên
+            // Ví dụ: "Số nhà, Tên đường, Phường, Quận, Thành phố"
+            const addressParts = [
+                // Ưu tiên tên địa điểm (nhà hát, tòa nhà...)
+                addr.amenity || addr.historic || addr.leisure || addr.shop || addr.tourism || addr.theatre,
+                // Số nhà và đường
+                addr.house_number,
+                addr.road,
+                // Đơn vị hành chính nhỏ
+                addr.suburb || addr.quarter, // Phường hoặc khu phố
+                addr.city_district || addr.county, // Quận hoặc huyện
+                addr.city || addr.state, // Thành phố hoặc tỉnh
+                addr.country
+            ];
+
+            // Lọc ra các phần tử không tồn tại (undefined) và ghép chúng lại
+            const formattedAddress = addressParts.filter(part => part).join(', ');
+
+            return formattedAddress || data.display_name; // Nếu không ghép được thì dùng display_name
+        }
+
+        // Nếu không có address object, dùng display_name (phòng hờ)
+        if (data && data.display_name) {
+            return data.display_name;
+        }
+
+        return 'Không tìm thấy địa chỉ chi tiết';
+    } catch (error) {
+        console.error('Lỗi khi lấy địa chỉ từ Nominatim:', error.message);
+        return 'Lỗi khi lấy địa chỉ';
+    }
+};
 
 // GET all devices
 router.get('/', async (req, res) => {
@@ -54,20 +99,6 @@ router.post('/', upload.single('image'), async (req, res) => {
     }
 });
 
-// PATCH: Toggle device status
-// router.patch('/:id/toggle', async (req, res) => {
-//     try {
-//         const device = await Device.findById(req.params.id);
-//         if (!device) return res.status(404).json({ error: 'Không tìm thấy thiết bị' });
-//
-//         device.status = device.status === 'Đang bay' ? 'Không hoạt động' : 'Đang bay';
-//         await device.save();
-//         res.json(device);
-//     } catch (err) {
-//         console.error(err);
-//         res.status(500).json({ error: 'Không thể cập nhật trạng thái' });
-//     }
-// });
 
 router.post('/:id/start', async (req, res) => {
     try {
@@ -75,20 +106,23 @@ router.post('/:id/start', async (req, res) => {
         if (!device) return res.status(404).json({ error: 'Không tìm thấy thiết bị' });
         if (device.status === 'Đang bay') return res.status(400).json({ error: 'Thiết bị đã đang bay' });
 
-        // Tạo một phiên bay mới
+        // Lấy địa chỉ bắt đầu
+        const startAddress = await getAddressFromCoordinates(device.location.lat, device.location.lng);
+
         const session = new FlightSession({
             deviceId: device._id,
             startTime: new Date(),
-            path: [device.location] // Điểm bắt đầu là vị trí hiện tại
+            path: [device.location],
+            startAddress: startAddress // Lưu địa chỉ
         });
         await session.save();
 
-        // Cập nhật trạng thái thiết bị
         device.status = 'Đang bay';
         await device.save();
 
-        res.json({ device, session }); // Trả về cả session để frontend có session._id
+        res.json({ device, session });
     } catch (err) {
+        console.error("Lỗi khi bắt đầu chuyến bay:", err);
         res.status(500).json({ error: 'Không thể bắt đầu chuyến bay' });
     }
 });
@@ -97,26 +131,32 @@ router.post('/:id/start', async (req, res) => {
 // Chúng ta sẽ dùng session ID để cập nhật cho chính xác
 router.post('/sessions/:sessionId/stop', async (req, res) => {
     try {
-        const { path, location } = req.body; // Frontend sẽ gửi lên đường đi cuối cùng
+        const { path, location } = req.body;
         const session = await FlightSession.findById(req.params.sessionId);
         if (!session) return res.status(404).json({ error: 'Không tìm thấy phiên bay' });
 
         const endTime = new Date();
-        const duration = Math.round((endTime - session.startTime) / 1000); // tính bằng giây
+        const duration = Math.round((endTime - session.startTime) / 1000);
+
+        // Lấy địa chỉ kết thúc
+        const endAddress = await getAddressFromCoordinates(location.lat, location.lng);
 
         session.endTime = endTime;
         session.durationInSeconds = duration;
         session.path = path;
+        session.endAddress = endAddress; // Lưu địa chỉ
         await session.save();
 
-        // Cập nhật lại thiết bị
         const device = await Device.findById(session.deviceId);
-        device.status = 'Không hoạt động';
-        device.location = location; // Cập nhật vị trí cuối cùng của thiết bị
-        await device.save();
+        if (device) {
+            device.status = 'Không hoạt động';
+            device.location = location;
+            await device.save();
+        }
 
         res.json({ device, session });
     } catch (err) {
+        console.error("Lỗi khi dừng chuyến bay:", err);
         res.status(500).json({ error: 'Không thể kết thúc chuyến bay' });
     }
 });

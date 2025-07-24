@@ -359,15 +359,18 @@ export default function DashboardUser({ user, onLogout, onUserUpdate}) {
                 <div className="history-list">
                   {allFlightHistory.length > 0 ? (
                       allFlightHistory.map(flight => {
-                        // Tìm tên thiết bị tương ứng với chuyến bay
                         const device = devices.find(d => d._id === flight.deviceId);
                         return (
                             <div key={flight._id} className="history-item">
                               <div className="history-item-info">
                                 <h3>{device ? device.name : 'Thiết bị đã xóa'}</h3>
-                                <p><strong>Bắt đầu:</strong> {new Date(flight.startTime).toLocaleString('vi-VN')}</p>
-                                <p><strong>Kết thúc:</strong> {flight.endTime ? new Date(flight.endTime).toLocaleString('vi-VN') : 'Đang bay'}</p>
-                                <p><strong>Thời gian:</strong> {flight.durationInSeconds} giây</p>
+                                {/* ✅ HIỂN THỊ ĐỊA CHỈ */}
+                                <p><strong>Từ:</strong> {flight.startAddress}</p>
+                                <p><strong>Đến:</strong> {flight.endAddress}</p>
+                                <p><strong>Thời gian bay:</strong> {flight.durationInSeconds} giây</p>
+                                <p style={{fontSize: '0.8rem', color: '#95a5a6'}}>
+                                  {new Date(flight.startTime).toLocaleString('vi-VN')}
+                                </p>
                               </div>
                               <div className="history-item-actions">
                                 <button
