@@ -6,6 +6,7 @@ const router = express.Router();
 const Device = require('../models/Device');
 const FlightSession = require('../models/FlightSession');
 const axios = require('axios');
+const authMiddleware = require('../middleware/auth');
 
 // Lưu ảnh vào thư mục "uploads/"
 const storage = multer.diskStorage({
@@ -65,40 +66,6 @@ const getAddressFromCoordinates = async (lat, lng) => {
     }
 };
 
-// GET all devices
-router.get('/', async (req, res) => {
-    try {
-        const devices = await Device.find();
-        res.json(devices);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Không thể lấy danh sách thiết bị' });
-    }
-});
-
-// POST: Add new device
-router.post('/', upload.single('image'), async (req, res) => {
-    try {
-        const { name, lat, lng } = req.body;
-        const newDevice = new Device({
-            name,
-            location: {
-                lat: parseFloat(lat),
-                lng: parseFloat(lng)
-            },
-            image: req.file
-                ? `/uploads/${req.file.filename}`
-                : 'https://via.placeholder.com/150',
-            status: 'Không hoạt động'
-        });
-        const saved = await newDevice.save();
-        res.json(saved);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Không thể thêm thiết bị' });
-    }
-});
-
 
 router.post('/:id/start', async (req, res) => {
     try {
@@ -127,34 +94,49 @@ router.post('/:id/start', async (req, res) => {
     }
 });
 
-// ✅ TẠO ROUTE MỚI: KẾT THÚC CHUYẾN BAY
-// Chúng ta sẽ dùng session ID để cập nhật cho chính xác
-router.post('/sessions/:sessionId/stop', async (req, res) => {
+router.post('/:id/stop', async (req, res) => {
     try {
         const { path, location } = req.body;
-        const session = await FlightSession.findById(req.params.sessionId);
-        if (!session) return res.status(404).json({ error: 'Không tìm thấy phiên bay' });
+        const deviceId = req.params.id;
+
+        // Tìm phiên bay đang hoạt động (chưa có endTime) của thiết bị này
+        const session = await FlightSession.findOne({
+            deviceId: deviceId,
+            endTime: { $exists: false }
+        });
+
+        if (!session) {
+            // Có thể chuyến bay đã kết thúc ở một tab khác, hoặc có lỗi.
+            // Cập nhật lại trạng thái thiết bị cho chắc chắn và báo lỗi nhẹ nhàng.
+            await Device.findByIdAndUpdate(deviceId, { status: 'Không hoạt động' });
+            return res.status(404).json({ error: 'Không tìm thấy phiên bay đang hoạt động cho thiết bị này.' });
+        }
+
+        const device = await Device.findById(deviceId);
+        if (!device) return res.status(404).json({ error: 'Không tìm thấy thiết bị.' });
+
+        // Dữ liệu cuối cùng: ưu tiên dữ liệu từ client, nếu không có thì dùng dữ liệu hiện tại trong DB
+        const finalLocation = location || device.location;
 
         const endTime = new Date();
         const duration = Math.round((endTime - session.startTime) / 1000);
+        const endAddress = await getAddressFromCoordinates(finalLocation.lat, finalLocation.lng);
 
-        // Lấy địa chỉ kết thúc
-        const endAddress = await getAddressFromCoordinates(location.lat, location.lng);
-
+        // Cập nhật session
         session.endTime = endTime;
         session.durationInSeconds = duration;
-        session.path = path;
-        session.endAddress = endAddress; // Lưu địa chỉ
+        session.endAddress = endAddress;
+        if (path) { // Chỉ cập nhật path nếu client gửi lên
+            session.path = path;
+        }
         await session.save();
 
-        const device = await Device.findById(session.deviceId);
-        if (device) {
-            device.status = 'Không hoạt động';
-            device.location = location;
-            await device.save();
-        }
+        // Cập nhật device
+        device.status = 'Không hoạt động';
+        device.location = finalLocation;
+        await device.save();
 
-        res.json({ device, session });
+        res.json({ message: 'Chuyến bay đã kết thúc thành công', device, session });
     } catch (err) {
         console.error("Lỗi khi dừng chuyến bay:", err);
         res.status(500).json({ error: 'Không thể kết thúc chuyến bay' });
@@ -182,6 +164,45 @@ router.delete('/:id', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Không thể xóa thiết bị' });
+    }
+});
+
+router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
+    try {
+        // Giờ chúng ta không cần userId từ req.body nữa
+        const { name, lat, lng } = req.body;
+
+        // ✅ LẤY USER ID TỪ TOKEN ĐÃ ĐƯỢC GIẢI MÃ
+        const userId = req.user.id;
+
+        const newDevice = new Device({
+            name,
+            location: { lat: parseFloat(lat), lng: parseFloat(lng) },
+            image: req.file ? `/uploads/${req.file.filename}` : 'https://via.placeholder.com/150',
+            status: 'Không hoạt động',
+            owner: userId, // ✅ Gán chủ sở hữu một cách an toàn
+            isApproved: false,
+            isLocked: false
+        });
+        const saved = await newDevice.save();
+        res.status(201).json(saved);
+    } catch (err) {
+        console.error("Lỗi tạo thiết bị:", err);
+        res.status(500).json({ error: 'Không thể thêm thiết bị' });
+    }
+});
+
+// ✅ CẬP NHẬT LẠI ROUTE GET CỦA USER
+router.get('/', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        console.log(`[BACKEND] GET /devices - Received request from user ID (from token): ${userId}`);
+
+        const devices = await Device.find({ owner: userId });
+        res.json(devices);
+    } catch (err) {
+        console.error("Lỗi lấy danh sách thiết bị của user:", err);
+        res.status(500).json({ error: 'Không thể lấy danh sách thiết bị' });
     }
 });
 

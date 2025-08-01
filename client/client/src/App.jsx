@@ -4,7 +4,7 @@ import React from 'react';
 import './App.css';
 import DashboardUser from './DashboardUser'; // 👈 import dashboard
 import 'leaflet/dist/leaflet.css';
-
+import DashboardAdmin from './DashboardAdmin';
 
 export default function App() {
   const [isLogin, setIsLogin] = useState(true);
@@ -29,9 +29,11 @@ export default function App() {
           email: form.email,
           password: form.password
         });
+        console.log("Đăng nhập thành công! Dữ liệu user nhận được:", res.data.user);
         // alert(`Đăng nhập thành công. Xin chào ${res.data.user.name}`);
         setUser(res.data.user);
         setIsLoggedIn(true); // 👈 chuyển sang dashboard
+        localStorage.setItem('token', res.data.token);
       } else {
         await axios.post('http://localhost:5000/api/register', form);
         alert('Đăng ký thành công!');
@@ -49,15 +51,15 @@ export default function App() {
 
   const handleUserUpdate = (updatedUserData) => {
     setUser(prevUser => ({ ...prevUser, ...updatedUserData }));
+    // localStorage.removeItem('token');
   };
 
   // 👉 Nếu đã login thì render DashboardUser
   if (isLoggedIn) {
-    return <DashboardUser
-              user={user}
-              onLogout={handleLogout}
-              onUserUpdate={handleUserUpdate}
-           />;
+    if (user.role === 'admin') {
+      return <DashboardAdmin user={user} onLogout={handleLogout} />;
+    }
+    return <DashboardUser user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} />;
   }
 
   // Màn hình đăng nhập/đăng ký

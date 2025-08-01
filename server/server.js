@@ -6,7 +6,7 @@ const authRoutes = require('./routes/auth');
 const deviceRoutes = require('./routes/device');
 const path = require('path');
 const userRoutes = require('./routes/user');
-
+const adminRoutes = require('./routes/admin');
 
 dotenv.config();
 const app = express();
@@ -17,6 +17,7 @@ app.use('/api', authRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
