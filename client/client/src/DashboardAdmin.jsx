@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { io } from "socket.io-client";
+import api from './api';
 import './Dashboard.css';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -34,46 +35,107 @@ const StatCard = ({ title, value, icon }) => (
 );
 
 export default function DashboardAdmin({ user, onLogout }) {
-    // --- STATE ---
     const [activeTab, setActiveTab] = useState('overview');
     const [stats, setStats] = useState({});
     const [users, setUsers] = useState([]);
     const [devices, setDevices] = useState([]);
     const [deviceTab, setDeviceTab] = useState('all');
 
-    // --- LOGIC ---
-    const fetchData = () => {
-        Promise.all([
-            axios.get(`${API_URL}/admin/stats`),
-            axios.get(`${API_URL}/admin/users`),
-            axios.get(`${API_URL}/admin/devices`),
-        ]).then(([statsRes, usersRes, devicesRes]) => {
-            setStats(statsRes.data);
-            setUsers(usersRes.data);
-            setDevices(devicesRes.data);
-        }).catch(err => console.error("Lỗi khi tải dữ liệu admin:", err));
-    };
-
     useEffect(() => {
+        let isMounted = true;
+        const fetchData = () => {
+            Promise.all([
+                api.get(`${API_URL}/admin/stats`),
+                api.get(`${API_URL}/admin/users`),
+                api.get(`${API_URL}/admin/devices`),
+            ]).then(([statsRes, usersRes, devicesRes]) => {
+                if(isMounted) {
+                    setStats(statsRes.data);
+                    setUsers(usersRes.data);
+                    setDevices(devicesRes.data);
+                }
+            }).catch(err => console.error("Lỗi tải dữ liệu admin:", err));
+        };
         fetchData();
+
+        const socket = io("http://localhost:5000");
+        const handleLocationUpdate = (data) => {
+            setDevices(prev => prev.map(d => d._id === data.deviceId ? { ...d, location: data.location, status: data.status } : d));
+        };
+        const handleStatusUpdate = (data) => {
+            setDevices(prev => prev.map(d => d._id === data.deviceId ? { ...d, status: data.status } : d));
+        };
+
+        socket.on('deviceLocationUpdate', handleLocationUpdate);
+        socket.on('deviceStatusUpdate', handleStatusUpdate);
+
+        return () => {
+            isMounted = false;
+            socket.disconnect();
+        };
     }, []);
 
-    const handleApproveDevice = async (id) => {
-        await axios.put(`${API_URL}/admin/devices/${id}/approve`);
-        fetchData();
+    const handleAvatarChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Kích thước ảnh quá lớn (tối đa 5MB)');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('avatar', file);
+        try {
+            // API endpoint để cập nhật avatar là chung cho mọi user, kể cả admin
+            const res = await api.put(`/users/${user._id}/avatar`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            // Gọi hàm onUserUpdate được truyền từ App.jsx
+            onUserUpdate(res.data);
+        } catch (err) {
+            console.error('Lỗi khi cập nhật avatar:', err);
+            alert('Không thể cập nhật avatar.');
+        }
     };
 
     const handleLockDevice = async (id) => {
-        await axios.put(`${API_URL}/admin/devices/${id}/lock`);
-        fetchData();
+        try {
+            // Gọi API để khóa/mở khóa thiết bị
+            await api.put(`${API_URL}/admin/devices/${id}/lock`);
+
+            // Cập nhật state 'devices' ngay lập tức để giao diện thay đổi
+            setDevices(prevDevices =>
+                prevDevices.map(device => {
+                    if (device._id === id) {
+                        // Đảo ngược trạng thái isLocked của thiết bị vừa được cập nhật
+                        return { ...device, isLocked: !device.isLocked };
+                    }
+                    return device;
+                })
+            );
+        } catch (err) {
+            console.error("Lỗi khi khóa/mở khóa thiết bị:", err);
+            alert("Đã có lỗi xảy ra. Vui lòng thử lại.");
+        }
     };
 
     const handleLockUser = async (id) => {
-        await axios.put(`${API_URL}/admin/users/${id}/lock`);
-        fetchData();
-    };
+        try {
+            // Gọi API để khóa/mở khóa người dùng
+            await api.put(`${API_URL}/admin/users/${id}/lock`);
 
-    // --- RENDER FUNCTIONS (Đã được khôi phục) ---
+            // Cập nhật state 'users' ngay lập tức để giao diện thay đổi
+            setUsers(prevUsers =>
+                prevUsers.map(u => {
+                    if (u._id === id) {
+                        // Đảo ngược trạng thái isLocked của người dùng vừa được cập nhật
+                        return { ...u, isLocked: !u.isLocked };
+                    }
+                    return u;
+                })
+            );
+        } catch (err) {
+            console.error("Lỗi khi khóa/mở khóa người dùng:", err);
+            alert("Đã có lỗi xảy ra. Vui lòng thử lại.");
+        }
+    };
 
     const renderOverview = () => (
         <>
@@ -81,38 +143,31 @@ export default function DashboardAdmin({ user, onLogout }) {
             <div className="stats-grid">
                 <StatCard title="Tổng người dùng" value={stats.userCount || 0} icon="👤" />
                 <StatCard title="Tổng thiết bị" value={stats.deviceCount || 0} icon="🚁" />
-                <StatCard title="Đang hoạt động" value={stats.flyingCount || 0} icon="✈️" />
-                <StatCard title="Chờ phê duyệt" value={stats.pendingCount || 0} icon="📝" />
+                <StatCard title="Đang hoạt động" value={stats.activeDeviceCount || 0} icon="✈️" />
+                <StatCard title="Thiết bị Offline" value={(stats.deviceCount || 0) - (stats.activeDeviceCount || 0)} icon="🔌" />
             </div>
         </>
     );
 
-    // ✅ KHÔI PHỤC HÀM NÀY
     const renderDeviceManagement = () => {
-        const pendingDevices = devices.filter(d => !d.isApproved);
         const lockedDevices = devices.filter(d => d.isLocked);
-
-        let devicesToList = devices;
-        if (deviceTab === 'pending') devicesToList = pendingDevices;
-        if (deviceTab === 'locked') devicesToList = lockedDevices;
+        const devicesToList = deviceTab === 'locked' ? lockedDevices : devices;
 
         return (
             <>
                 <h2>Quản lý thiết bị</h2>
                 <div className="sub-tabs">
                     <button onClick={() => setDeviceTab('all')} className={deviceTab === 'all' ? 'active' : ''}>Tất cả ({devices.length})</button>
-                    <button onClick={() => setDeviceTab('pending')} className={deviceTab === 'pending' ? 'active' : ''}>Chờ duyệt ({pendingDevices.length})</button>
                     <button onClick={() => setDeviceTab('locked')} className={deviceTab === 'locked' ? 'active' : ''}>Bị khóa ({lockedDevices.length})</button>
                 </div>
                 <div className="device-list">
                     {devicesToList.map(device => (
                         <div key={device._id} className={`device-card ${device.isLocked ? 'locked' : ''}`}>
-                            <img src={`http://localhost:5000${device.image}`} alt={device.name} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />
+                            <img src={`http://localhost:5000${device.image}`} alt={device.name} />
                             <h3>{device.name}</h3>
                             <p>Chủ sở hữu: {device.owner?.name || 'N/A'}</p>
                             <p>Trạng thái: {device.status}</p>
                             <div className="card-actions">
-                                {!device.isApproved && <button onClick={() => handleApproveDevice(device._id)} className="approve">Duyệt</button>}
                                 <button onClick={() => handleLockDevice(device._id)}>{device.isLocked ? 'Mở khóa' : 'Khóa'}</button>
                             </div>
                         </div>
@@ -122,7 +177,6 @@ export default function DashboardAdmin({ user, onLogout }) {
         );
     };
 
-    // ✅ KHÔI PHỤC HÀM NÀY
     const renderUserManagement = () => (
         <>
             <h2>Quản lý người dùng</h2>
@@ -146,7 +200,13 @@ export default function DashboardAdmin({ user, onLogout }) {
                         <td>{u.role}</td>
                         <td>{u.isLocked ? <span className="locked-tag">Bị khóa</span> : <span className="active-tag">Hoạt động</span>}</td>
                         <td>
-                            <button onClick={() => handleLockUser(u._id)}>{u.isLocked ? 'Mở khóa' : 'Khóa'}</button>
+                            {/* Thay đổi chính nằm ở thẻ button dưới đây */}
+                            <button
+                                onClick={() => handleLockUser(u._id)}
+                                className={`action-btn ${u.isLocked ? 'unlock-btn' : 'lock-btn'}`}
+                            >
+                                {u.isLocked ? 'Mở khóa' : 'Khóa'}
+                            </button>
                         </td>
                     </tr>
                 ))}

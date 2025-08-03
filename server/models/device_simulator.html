@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GPS Simulator</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+            --warning-color: #f1c40f;
+            --light-bg: #f4f6f9;
+            --dark-text: #2c3e50;
+            --light-text: #7f8c8d;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 15px; background-color: var(--light-bg); color: var(--dark-text); }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: var(--dark-text); text-align: center; margin-top: 0; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 1rem; }
+        input[type="text"] { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; transition: border-color 0.3s, box-shadow 0.3s; }
+        input[type="text"]:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2); outline: none; }
+        #toggleBtn { width: 100%; padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer; border: none; border-radius: 8px; color: white; background-color: var(--primary-color); transition: background-color 0.3s, transform 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        #toggleBtn:hover { background-color: #2980b9; }
+        #toggleBtn:active { transform: scale(0.98); }
+        #toggleBtn.active { background-color: var(--error-color); }
+        #toggleBtn.active:hover { background-color: #c0392b; }
+        .icon { font-size: 1.2em; }
+        .status-card { margin-top: 20px; padding: 15px; border-radius: 8px; border-left: 5px solid; }
+        .status-card.info { border-color: var(--primary-color); background-color: #eaf5ff; }
+        .status-card.success { border-color: var(--success-color); background-color: #eafaf1; }
+        .status-card.error { border-color: var(--error-color); background-color: #fdedec; }
+        .log-container { margin-top: 20px; }
+        #log { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; height: 150px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word; }
+        #log div { padding: 2px 0; border-bottom: 1px solid #34495e; }
+        #log .log-error { color: #ff7675; }
+        #log .log-success { color: #55efc4; }
+        #log .log-info { color: #74b9ff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><span class="icon">🛰️</span> GPS Simulator</h1>
+
+    <div>
+        <label for="deviceId">Mã định danh (S/N):</label>
+        <input type="text" id="deviceId" placeholder="Nhập S/N từ trang quản lý">
+    </div>
+
+    <button id="toggleBtn">
+        <span class="icon">▶️</span>
+        <span>Bắt đầu gửi GPS</span>
+    </button>
+
+    <div id="status-card" class="status-card info">
+        <strong>Trạng thái:</strong> <span>Sẵn sàng.</span>
+    </div>
+
+    <div class="log-container">
+        <label>Nhật ký hoạt động:</label>
+        <div id="log"></div>
+    </div>
+</div>
+
+<script>
+    const deviceIdInput = document.getElementById('deviceId');
+    const statusCard = document.getElementById('status-card');
+    const statusText = statusCard.querySelector('span');
+    const logContainer = document.getElementById('log');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const btnIcon = toggleBtn.querySelector('.icon');
+    const btnText = toggleBtn.querySelector('span');
+
+    // ⚠️ QUAN TRỌNG: Thay đổi URL này thành IP của máy tính của bạn
+    const SERVER_URL = 'http://192.168.0.104:5000';
+
+    let watchId = null;
+
+    function log(message, type = 'info') {
+        const time = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-${type}`;
+        logEntry.textContent = `[${time}] ${message}`;
+        logContainer.prepend(logEntry); // Thêm log mới lên đầu
+    }
+
+    deviceIdInput.value = localStorage.getItem('lastDeviceId') || '';
+    deviceIdInput.addEventListener('input', (e) => {
+        localStorage.setItem('lastDeviceId', e.target.value);
+    });
+
+    async function sendLocation(position) {
+        const currentDeviceId = deviceIdInput.value.trim();
+        log(`Lấy được vị trí: Lat ${position.coords.latitude.toFixed(4)}, Lng ${position.coords.longitude.toFixed(4)}`);
+
+        const locationData = {
+            deviceId: currentDeviceId,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+        };
+
+        try {
+            log(`Đang gửi tới server...`);
+            const res = await fetch(`${SERVER_URL}/api/devices/location`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(locationData)
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error || `Server trả về lỗi ${res.status}`);
+
+            log(`Server phản hồi: ${data.message}`, 'success');
+            updateStatus('Đã gửi thành công!', 'success');
+
+        } catch (error) {
+            console.error('Lỗi khi gửi vị trí:', error);
+            log(`Lỗi khi gửi request: ${error.message}`, 'error');
+            updateStatus(`Lỗi kết nối.`, 'error');
+            stopSending();
+        }
+    }
+
+    function startSending() {
+        log('Nút "Bắt đầu" được nhấn.');
+        if (!navigator.geolocation) {
+            log('Trình duyệt không hỗ trợ Geolocation.', 'error');
+            updateStatus('Trình duyệt không hỗ trợ GPS.', 'error');
+            return;
+        }
+        const currentDeviceId = deviceIdInput.value.trim();
+        if (!currentDeviceId) {
+            log('Mã định danh trống.', 'error');
+            updateStatus('Vui lòng nhập Mã định danh.', 'error');
+            return;
+        }
+        if (watchId) {
+            log('Đã đang chạy, bỏ qua.');
+            return;
+        }
+
+        log('Yêu cầu quyền truy cập GPS...');
+        updateStatus('Đang chờ quyền GPS...', 'info');
+
+        const options = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
+
+        // Dùng getCurrentPosition để kiểm tra quyền một lần trước
+        navigator.geolocation.getCurrentPosition(
+            (initialPosition) => {
+                log('Đã có quyền GPS. Bắt đầu theo dõi...', 'success');
+                watchId = navigator.geolocation.watchPosition(sendLocation, handleError, options);
+
+                btnText.textContent = 'Dừng gửi GPS';
+                btnIcon.textContent = '⏹️';
+                toggleBtn.classList.add('active');
+                deviceIdInput.disabled = true;
+                updateStatus('Đang gửi vị trí...', 'success');
+                sendLocation(initialPosition); // Gửi vị trí đầu tiên ngay lập tức
+            },
+            (error) => {
+                handleError(error); // Gọi hàm xử lý lỗi chung
+            },
+            options
+        );
+    }
+
+    function stopSending() {
+        log('Nút "Dừng" được nhấn hoặc có lỗi.');
+        if (watchId) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+        btnText.textContent = 'Bắt đầu gửi GPS';
+        btnIcon.textContent = '▶️';
+        toggleBtn.classList.remove('active');
+        deviceIdInput.disabled = false;
+        updateStatus('Đã dừng.', 'info');
+    }
+
+    function handleError(error) {
+        let message = '';
+        switch(error.code) {
+            case error.PERMISSION_DENIED:
+                message = "Người dùng từ chối quyền truy cập vị trí.";
+                break;
+            case error.POSITION_UNAVAILABLE:
+                message = "Thông tin vị trí không có sẵn.";
+                break;
+            case error.TIMEOUT:
+                message = "Yêu cầu lấy vị trí hết hạn.";
+                break;
+            default:
+                message = "Một lỗi không xác định đã xảy ra.";
+                break;
+        }
+        log(message, 'error');
+        updateStatus(message, 'error');
+        stopSending();
+    }
+
+    function updateStatus(message, type) {
+        statusCard.className = `status-card ${type}`;
+        statusText.textContent = message;
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        if (watchId) {
+            stopSending();
+        } else {
+            startSending();
+        }
+    });
+
+    log('Simulator đã sẵn sàng.');
+</script>
+</body>
+</html>

@@ -1,13 +1,11 @@
-// src/DashboardUser.jsx
-
 import React, { useState, useEffect } from 'react';
+import { io } from "socket.io-client";
 import './Dashboard.css';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from './api';
 
-// --- Phần thiết lập icon Leaflet không đổi ---
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
@@ -15,100 +13,107 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
 
-// Các hàm và state khác không đổi...
-// ... (Giữ nguyên toàn bộ phần code từ đầu file cho đến trước component return) ...
-
-export default function DashboardUser({ user, onLogout, onUserUpdate}) {
-    // --- Toàn bộ state và các hàm useEffect, handle... giữ nguyên như cũ ---
-    const [showAddModal, setShowAddModal] = useState(false);
+export default function DashboardUser({ user, onLogout, onUserUpdate }) {
+    // --- STATE ---
     const [devices, setDevices] = useState([]);
+    const [showAddModal, setShowAddModal] = useState(false);
     const [selectedDevice, setSelectedDevice] = useState(null);
-    const [newDevice, setNewDevice] = useState({ name: '', lat: '', lng: '', image: '' });
-    const [activeSimulations, setActiveSimulations] = useState({});
-    const [viewingFlight, setViewingFlight] = useState(null);
-    const [allFlightHistory, setAllFlightHistory] = useState([]);
+    const [newDevice, setNewDevice] = useState({ name: '', deviceId: '', modelId: '', image: null });
     const [activeTab, setActiveTab] = useState('devices');
-    const [deviceView, setDeviceView] = useState('approved');
+    const [allFlightHistory, setAllFlightHistory] = useState([]);
+    const [viewingFlight, setViewingFlight] = useState(null);
     const [username, setUsername] = useState(user?.name || '');
     const [passwords, setPasswords] = useState({ current: '', new: '' });
+    const [manufacturers, setManufacturers] = useState([]);
+    const [models, setModels] = useState([]);
+    const [selectedManufacturer, setSelectedManufacturer] = useState('');
+    const [historyFetched, setHistoryFetched] = useState(false);
 
+    // useEffect chính để fetch dữ liệu ban đầu và lắng nghe WebSocket
     useEffect(() => {
-        api.get('/devices')
-            .then(res => {
-                const devicesData = res.data;
-                setDevices(devicesData);
-                if (devicesData.length === 0) return;
-                const historyPromises = devicesData.map(device => api.get(`/devices/${device._id}/history`));
-                Promise.all(historyPromises)
-                    .then(results => {
-                        const allFlights = results.flatMap(result => result.data);
-                        allFlights.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-                        setAllFlightHistory(allFlights);
-                    })
-                    .catch(historyErr => console.error("Lỗi khi tải lịch sử bay:", historyErr));
-            })
-            .catch(err => console.error('Lỗi nghiêm trọng khi tải danh sách thiết bị:', err.response || err));
+        let isMounted = true;
+        api.get('/devices').then(res => {
+            if (isMounted) setDevices(res.data);
+        }).catch(err => console.error("Lỗi tải thiết bị:", err));
+
+        const socket = io("http://localhost:5000");
+        const handleLocationUpdate = (data) => {
+            setDevices(prev => prev.map(d => d._id === data.deviceId ? { ...d, location: data.location, status: data.status } : d));
+        };
+        const handleStatusUpdate = (data) => {
+            setDevices(prev => prev.map(d => d._id === data.deviceId ? { ...d, status: data.status } : d));
+        };
+
+        socket.on('deviceLocationUpdate', handleLocationUpdate);
+        socket.on('deviceStatusUpdate', handleStatusUpdate);
+
+        return () => {
+            isMounted = false;
+            socket.off('deviceLocationUpdate', handleLocationUpdate);
+            socket.off('deviceStatusUpdate', handleStatusUpdate);
+            socket.disconnect();
+        };
     }, []);
 
-    const simulateMovement = (lat, lng) => {
-        const latOffset = (Math.random() - 0.5) * 0.002;
-        const lngOffset = (Math.random() - 0.5) * 0.002;
-        return { lat: lat + latOffset, lng: lng + lngOffset };
+    // useEffect để fetch lịch sử khi người dùng chuyển tab
+    useEffect(() => {
+        if (activeTab === 'history' && !historyFetched) {
+            const fetchAllHistory = async () => {
+                try {
+                    const deviceIds = devices.map(d => d._id);
+                    const historyPromises = deviceIds.map(id => api.get(`/devices/${id}/history`));
+                    const results = await Promise.all(historyPromises);
+                    const allFlights = results.flatMap(result => result.data);
+                    allFlights.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+                    setAllFlightHistory(allFlights);
+                    setHistoryFetched(true);
+                } catch (err) {
+                    console.error("Lỗi khi tải lịch sử bay:", err);
+                }
+            };
+            fetchAllHistory();
+        }
+    }, [activeTab, devices, historyFetched]);
+
+    // Các hàm xử lý modal và form
+    const handleOpenAddModal = () => {
+        setNewDevice({ name: '', deviceId: '', modelId: '', image: null });
+        setSelectedManufacturer('');
+        setModels([]);
+        setShowAddModal(true);
     };
 
-    const handleStartFlight = async (deviceId) => {
-        try {
-            const res = await api.post(`/devices/${deviceId}/start`);
-            const { device, session } = res.data;
-            setActiveSimulations(prevSims => ({
-                ...prevSims,
-                [deviceId]: { intervalId: null, sessionId: session._id, path: [device.location] }
-            }));
-            setDevices(prev => prev.map(d => d._id === deviceId ? { ...d, status: 'Đang bay' } : d));
-            const intervalId = setInterval(() => {
-                let newLocation = null;
-                setActiveSimulations(currentSims => {
-                    const currentSim = currentSims[deviceId];
-                    if (!currentSim) {
-                        clearInterval(intervalId);
-                        return currentSims;
-                    }
-                    const lastPosition = currentSim.path[currentSim.path.length - 1];
-                    newLocation = simulateMovement(lastPosition.lat, lastPosition.lng);
-                    return { ...currentSims, [deviceId]: { ...currentSim, path: [...currentSim.path, newLocation] } };
-                });
-                setDevices(currentDevices => currentDevices.map(d => d._id === deviceId && newLocation ? { ...d, location: newLocation } : d));
-            }, 2000);
-            setActiveSimulations(prevSims => ({ ...prevSims, [deviceId]: { ...prevSims[deviceId], intervalId: intervalId } }));
-        } catch (err) {
-            alert(err.response?.data?.error || 'Lỗi khi bắt đầu bay');
-        }
-    };
+    useEffect(() => {
+        if (showAddModal) api.get('/manufacturers').then(res => setManufacturers(res.data));
+    }, [showAddModal]);
 
-    const handleStopFlight = async (deviceId) => {
-        const simulation = activeSimulations[deviceId];
-        if (simulation && simulation.intervalId) {
-            clearInterval(simulation.intervalId);
+    useEffect(() => {
+        if (selectedManufacturer) {
+            setModels([]);
+            setNewDevice(prev => ({ ...prev, modelId: '' }));
+            api.get(`/manufacturers/${selectedManufacturer}/models`).then(res => setModels(res.data));
         }
-        const deviceToUpdate = devices.find(d => d._id === deviceId);
-        if (!deviceToUpdate) {
-            alert('Lỗi: Không tìm thấy thông tin thiết bị trên giao diện. Vui lòng thử tải lại trang.');
+    }, [selectedManufacturer]);
+
+    const handleAddDevice = async (e) => {
+        e.preventDefault();
+        const { name, deviceId, modelId, image } = newDevice;
+        if (!modelId || !name || !deviceId) {
+            alert("Vui lòng điền đầy đủ tất cả các trường bắt buộc.");
             return;
         }
         try {
-            const payload = simulation ? { path: simulation.path, location: deviceToUpdate.location } : {};
-            await api.post(`/devices/${deviceId}/stop`, payload);
-            alert('Chuyến bay đã kết thúc và được lưu lại.');
-            const res = await api.get(`/devices`);
-            setDevices(res.data);
-            const newSims = { ...activeSimulations };
-            delete newSims[deviceId];
-            setActiveSimulations(newSims);
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('deviceId', deviceId);
+            formData.append('modelId', modelId);
+            if (image) formData.append('image', image);
+            const res = await api.post('/devices', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            setDevices(prev => [...prev, res.data]);
+            alert('Đăng ký thiết bị thành công!');
+            setShowAddModal(false);
         } catch (err) {
-            console.error('Lỗi khi gọi API dừng bay:', err);
-            alert(err.response?.data?.error || 'Lỗi từ server khi dừng bay');
-            const res = await api.get(`/devices`);
-            setDevices(res.data);
+            alert(err.response?.data?.error || 'Lỗi khi đăng ký thiết bị.');
         }
     };
 
@@ -118,34 +123,8 @@ export default function DashboardUser({ user, onLogout, onUserUpdate}) {
                 await api.delete(`/devices/${id}`);
                 setDevices(devices.filter(d => d._id !== id));
             } catch (err) {
-                console.error('Lỗi khi xóa:', err);
                 alert('Không thể xóa thiết bị.');
             }
-        }
-    };
-
-    const handleAddDevice = async (e) => {
-        e.preventDefault();
-        if (!newDevice.name || !newDevice.lat || !newDevice.lng) {
-            alert("Vui lòng điền đầy đủ tên và tọa độ.");
-            return;
-        }
-        try {
-            const formData = new FormData();
-            formData.append('name', newDevice.name);
-            formData.append('lat', newDevice.lat);
-            formData.append('lng', newDevice.lng);
-            if (newDevice.image) formData.append('image', newDevice.image);
-            await api.post('/devices', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-            alert('Đã gửi yêu cầu thêm thiết bị. Vui lòng chờ quản trị viên phê duyệt.');
-            const updatedDevicesResponse = await api.get('/devices');
-            setDevices(updatedDevicesResponse.data);
-            setNewDevice({ name: '', lat: '', lng: '', image: '' });
-            setShowAddModal(false);
-            setDeviceView('pending');
-        } catch (err) {
-            console.error('Lỗi chi tiết khi thêm thiết bị:', err.response || err);
-            alert(err.response?.data?.error || 'Đã có lỗi xảy ra.');
         }
     };
 
@@ -166,23 +145,49 @@ export default function DashboardUser({ user, onLogout, onUserUpdate}) {
             alert('Không thể cập nhật avatar.');
         }
     };
+    //
+    // useEffect(() => {
+    //     if (showAddModal) {
+    //         api.get('/manufacturers').then(res => setManufacturers(res.data));
+    //     }
+    // }, [showAddModal]);
+    //
+    // // Khi chọn hãng, fetch danh sách model
+    // useEffect(() => {
+    //     if (selectedManufacturer) {
+    //         setModels([]);
+    //         setNewDevice(prev => ({ ...prev, modelId: '' }));
+    //         api.get(`/manufacturers/${selectedManufacturer}/models`).then(res => setModels(res.data));
+    //     }
+    // }, [selectedManufacturer]);
+
+
 
     const approvedDevices = devices.filter(d => d.isApproved);
     const pendingDevices = devices.filter(d => !d.isApproved);
 
     return (
         <div className="dashboard-layout">
-            {/* --- Sidebar và Main Content giữ nguyên như cũ --- */}
             <div className="sidebar">
                 <div className="user-info">
                     <label htmlFor="avatar-upload">
-                        <img src={`http://localhost:5000${user.avatar}`} alt="avatar" className="avatar" />
+                        <img
+                            src={`http://localhost:5000${user.avatar}`}
+                            alt="avatar"
+                            className="avatar"
+                        />
                     </label>
-                    <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
+                    <input
+                        id="avatar-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        style={{ display: 'none' }}
+                    />
                     <div className="username">{user?.name || 'Người dùng'}</div>
                 </div>
                 <nav className="menu-vertical">
-                    <button className={activeTab === 'devices' ? 'active' : ''} onClick={() => setActiveTab('devices')}>Thiết bị bay của tôi</button>
+                    <button className={activeTab === 'devices' ? 'active' : ''} onClick={() => setActiveTab('devices')}>Thiết bị của tôi</button>
                     <button className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}>Lịch sử bay</button>
                     <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>Cài đặt</button>
                     <button onClick={onLogout} className="logout-button">Đăng xuất</button>
@@ -191,57 +196,29 @@ export default function DashboardUser({ user, onLogout, onUserUpdate}) {
             <div className="main-content">
                 {activeTab === 'devices' && (
                     <>
-                        <h2>Thiết bị bay</h2>
-                        <div className="sub-tabs">
-                            <button onClick={() => setDeviceView('approved')} className={deviceView === 'approved' ? 'active' : ''}>
-                                Đã duyệt ({approvedDevices.length})
-                            </button>
-                            <button onClick={() => setDeviceView('pending')} className={deviceView === 'pending' ? 'active' : ''}>
-                                Chờ duyệt ({pendingDevices.length})
-                            </button>
-                        </div>
-                        {deviceView === 'approved' && (
-                            <div className="device-list">
-                                {approvedDevices.map((device) => (
-                                    <div key={device._id} className="device-card">
-                                        <img src={`http://localhost:5000${device.image}`} alt={device.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px' }} />
-                                        <h3>{device.name}</h3>
-                                        <p><strong>Trạng thái:</strong> {device.isLocked ? 'Bị khóa' : device.status}</p>
-                                        <p><strong>Vị trí:</strong> {device.location?.lat}, {device.location?.lng}</p>
-                                        <div className="card-actions">
-                                            {/* // CHANGED: Xóa viewingFlight khi chỉ xem vị trí */}
-                                            <button onClick={() => { setSelectedDevice(device); setViewingFlight(null); }}>Vị trí</button>
-                                            {device.status === 'Đang bay' ? (
-                                                <button onClick={() => handleStopFlight(device._id)} className="danger" disabled={device.isLocked}>Ngừng bay</button>
-                                            ) : (
-                                                <button onClick={() => handleStartFlight(device._id)} disabled={device.isLocked}>Bắt đầu bay</button>
-                                            )}
-                                            <button onClick={() => handleDelete(device._id)} className="danger">Xóa</button>
-                                        </div>
+                        <h2>Thiết bị của tôi</h2>
+                        <div className="device-list">
+                            {devices.map((device) => (
+                                <div key={device._id} className="device-card">
+                                    <img src={`http://localhost:5000${device.image}`} alt={device.name} />
+                                    <h3>{device.name}</h3>
+                                    <p><strong>Trạng thái:</strong> {device.isLocked ? 'Bị khóa' : device.status}</p>
+                                    {device.location?.lat ? (
+                                        <p><strong>Vị trí:</strong> {device.location.lat.toFixed(4)}, {device.location.lng.toFixed(4)}</p>
+                                    ) : (
+                                        <p><strong>Vị trí:</strong> <i>Chưa có tín hiệu</i></p>
+                                    )}
+                                    <div className="card-actions">
+                                        <button onClick={() => { setSelectedDevice(device); setViewingFlight(null); }} disabled={!device.location?.lat}>Xem vị trí</button>
+                                        <button onClick={() => handleDelete(device._id)} className="danger">Xóa</button>
                                     </div>
-                                ))}
-                                <div className="device-card add-card" onClick={() => setShowAddModal(true)}>
-                                    <div className="plus-icon">＋</div>
-                                    <p>Thêm thiết bị</p>
                                 </div>
+                            ))}
+                            <div className="device-card add-card" onClick={handleOpenAddModal}>
+                                <div className="plus-icon">＋</div>
+                                <p>Thêm thiết bị</p>
                             </div>
-                        )}
-                        {deviceView === 'pending' && (
-                            <div className="device-list">
-                                {pendingDevices.length === 0 && <p>Không có thiết bị nào đang chờ phê duyệt.</p>}
-                                {pendingDevices.map((device) => (
-                                    <div key={device._id} className="device-card">
-                                        <img src={`http://localhost:5000${device.image}`} alt={device.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px' }} />
-                                        <h3>{device.name}</h3>
-                                        <p><strong>Trạng thái:</strong> Chờ phê duyệt</p>
-                                        <p style={{ color: '#888' }}><i>Vị trí ban đầu: {device.location?.lat}, {device.location?.lng}</i></p>
-                                        <div className="card-actions">
-                                            <button onClick={() => handleDelete(device._id)} className="danger">Hủy yêu cầu</button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        </div>
                     </>
                 )}
                 {activeTab === 'history' && (
@@ -261,22 +238,96 @@ export default function DashboardUser({ user, onLogout, onUserUpdate}) {
                                                 <p style={{ fontSize: '0.8rem', color: '#95a5a6' }}>{new Date(flight.startTime).toLocaleString('vi-VN')}</p>
                                             </div>
                                             <div className="history-item-actions">
-                                                <button onClick={() => { if (device) { setViewingFlight(flight); setSelectedDevice(device); } else { alert("Không thể xem lại vì thiết bị này đã bị xóa."); } }} disabled={!device}>
-                                                    Xem lại hành trình
-                                                </button>
+                                                <button onClick={() => { if (device) { setViewingFlight(flight); setSelectedDevice(device); } else { alert("Không thể xem lại vì thiết bị này đã bị xóa."); } }} disabled={!device}>Xem lại hành trình</button>
                                             </div>
                                         </div>
                                     );
                                 })
                             ) : (
-                                <p>Chưa có chuyến bay nào được ghi lại.</p>
+                                <p>{historyFetched ? "Chưa có chuyến bay nào được ghi lại." : "Đang tải lịch sử..."}</p>
                             )}
                         </div>
                     </div>
                 )}
                 {activeTab === 'settings' && (
                     <div className="settings-tab">
-                        {/* Phần cài đặt không thay đổi */}
+                        <h2>Cài đặt tài khoản</h2>
+
+                        {/* --- Card Đổi tên người dùng --- */}
+                        <div className="settings-card">
+                            <h3>Thông tin cá nhân</h3>
+                            <p className="card-description">Tên này sẽ được hiển thị trên hồ sơ của bạn.</p>
+                            <form
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    try {
+                                        const res = await api.put(`/users/${user._id}`, { name: username });
+                                        onUserUpdate(res.data);
+                                        alert('Đã cập nhật tên người dùng');
+                                    } catch (err) {
+                                        alert('Lỗi khi cập nhật tên');
+                                        console.error(err);
+                                    }
+                                }}
+                            >
+                                <label htmlFor="username-input">Tên hiển thị</label>
+                                <input
+                                    id="username-input"
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="Nhập tên mới của bạn"
+                                />
+                                <div className="form-actions">
+                                    <button type="submit">Lưu thay đổi</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {/* --- Card Đổi mật khẩu --- */}
+                        <div className="settings-card">
+                            <h3>Bảo mật</h3>
+                            <p className="card-description">Để tăng cường bảo mật, hãy chọn một mật khẩu mạnh và duy nhất.</p>
+                            <form
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    if (!passwords.current || !passwords.new) {
+                                        alert("Vui lòng nhập đầy đủ mật khẩu.");
+                                        return;
+                                    }
+                                    try {
+                                        await api.put(`/users/${user._id}/password`, passwords);
+                                        alert('Đổi mật khẩu thành công');
+                                        setPasswords({ current: '', new: '' });
+                                    } catch (err)
+                                    {
+                                        alert(err.response?.data?.error || 'Lỗi khi đổi mật khẩu');
+                                        console.error(err);
+                                    }
+                                }}
+                            >
+                                <label htmlFor="current-password">Mật khẩu hiện tại</label>
+                                <input
+                                    id="current-password"
+                                    type="password"
+                                    value={passwords.current}
+                                    onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                                    placeholder="••••••••"
+                                />
+
+                                <label htmlFor="new-password">Mật khẩu mới</label>
+                                <input
+                                    id="new-password"
+                                    type="password"
+                                    value={passwords.new}
+                                    onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                                    placeholder="••••••••"
+                                />
+                                <div className="form-actions">
+                                    <button type="submit">Đổi mật khẩu</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 )}
             </div>
@@ -342,9 +393,66 @@ export default function DashboardUser({ user, onLogout, onUserUpdate}) {
             {/* Add Device Modal không đổi */}
             {showAddModal && (
                 <div className="modal-overlay">
-                    {/* ... */}
+                    <div className="modal-content">
+                        <h3>Đăng ký thiết bị bay mới</h3>
+                        <form onSubmit={handleAddDevice}>
+                            <p style={{fontSize: '0.9rem', color: '#666', textAlign: 'left', marginBottom: '15px'}}>
+                                Chọn hãng, model và nhập mã định danh (S/N) của thiết bị.
+                            </p>
+
+                            <select
+                                value={selectedManufacturer}
+                                onChange={(e) => setSelectedManufacturer(e.target.value)}
+                                required
+                            >
+                                <option value="">-- Chọn hãng sản xuất --</option>
+                                {manufacturers.map(m => <option key={m._id} value={m._id}>{m.name}</option>)}
+                            </select>
+
+                            <select
+                                value={newDevice.modelId}
+                                onChange={(e) => setNewDevice({ ...newDevice, modelId: e.target.value })}
+                                required
+                                disabled={!selectedManufacturer || models.length === 0}
+                            >
+                                <option value="">-- Chọn model thiết bị --</option>
+                                {models.map(m => <option key={m._id} value={m._id}>{m.modelName}</option>)}
+                            </select>
+
+                            <input
+                                type="text"
+                                placeholder="Tên gợi nhớ (ví dụ: Drone quay phim Vũng Tàu)"
+                                value={newDevice.name}
+                                onChange={e => setNewDevice({ ...newDevice, name: e.target.value })}
+                                required
+                            />
+
+                            <input
+                                type="text"
+                                placeholder="Mã định danh duy nhất (S/N)"
+                                value={newDevice.deviceId}
+                                onChange={e => setNewDevice({ ...newDevice, deviceId: e.target.value })}
+                                required
+                            />
+
+                            <label htmlFor="device-image" style={{textAlign: 'left', display: 'block', marginBottom: '5px'}}>Ảnh đại diện thiết bị</label>
+                            <input
+                                id="device-image"
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setNewDevice({ ...newDevice, image: e.target.files[0] })}
+                            />
+
+                            <div className="modal-actions">
+                                <button type="submit">Đăng ký</button>
+                                <button type="button" onClick={() => setShowAddModal(false)}>Hủy</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
         </div>
     );
+
+
 }

@@ -22,6 +22,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%; /* Đảm bảo user-info chiếm toàn bộ chiều rộng */
 }
 
 .avatar {
@@ -46,6 +47,7 @@
     width: 100%;
     margin-top: 50px;
     gap: 10px;
+    flex-grow: 1; /* THAY ĐỔI: Cho phép menu chiếm hết không gian dọc còn lại */
 }
 
 .menu-vertical button {
@@ -58,6 +60,8 @@
     cursor: pointer;
     transition: background 0.2s;
     border-radius: 5px;
+    font-size: 1rem; /* THAY ĐỔI: Tăng kích thước chữ */
+    font-weight: 500; /* THAY ĐỔI: Chữ đậm hơn một chút */
 }
 
 .menu-vertical button:hover,
@@ -65,10 +69,26 @@
     background-color: #2e2e4d;
 }
 
+/* Nút đăng xuất được thiết kế lại để nằm dưới cùng */
 .logout-button {
-    margin-top: 280px;
+    background: none;
+    border: none;
     color: #ff6b6b;
+    padding: 15px;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 5px;
+    font-size: 1rem;
+    font-weight: 500;
+    margin-top: auto; /* THAY ĐỔI: Tự động đẩy nút xuống dưới cùng */
 }
+
+.logout-button:hover {
+    background-color: #2e2e4d;
+}
+
 
 /* Nội dung chính bên phải */
 .main-content {
@@ -188,7 +208,7 @@
     border: 2px dashed #999;
     color: #777;
     cursor: pointer;
-    height: 200px;
+    min-height: 280px; /* Đặt chiều cao tối thiểu cho card "Thêm" */
 }
 .plus-icon {
     font-size: 48px;
@@ -217,10 +237,11 @@
     max-width: 90%;
 }
 
-.modal-content input {
+.modal-content input, .modal-content select {
     width: 100%;
     margin-bottom: 10px;
     padding: 8px;
+    box-sizing: border-box; /* Đảm bảo padding không làm tăng width */
 }
 
 .modal-actions {
@@ -303,6 +324,7 @@
     font-size: 1rem;
     margin-bottom: 1rem;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-sizing: border-box;
 }
 
 .settings-card form input[type="text"]:focus,
@@ -438,4 +460,43 @@
     border: 2px solid #ffffff; /* Thêm viền trắng để nổi bật */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4); /* Thêm bóng đổ */
     object-fit: cover; /* Đảm bảo ảnh lấp đầy vòng tròn mà không bị méo */
+}
+
+/* --- Styling cho nút Khóa/Mở khóa trong bảng Admin --- */
+
+/* Style chung cho cả 2 nút */
+.user-table .action-btn {
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    min-width: 80px; /* Đảm bảo 2 nút có chiều rộng bằng nhau */
+    text-align: center;
+}
+
+.user-table .action-btn:hover {
+    transform: translateY(-2px); /* Hiệu ứng nhấc lên khi hover */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Style riêng cho nút "Khóa" (màu đỏ) */
+.user-table .lock-btn {
+    background-color: #e74c3c; /* Màu đỏ tương tự tag "Bị khóa" */
+}
+
+.user-table .lock-btn:hover {
+    background-color: #c0392b; /* Màu đỏ đậm hơn */
+}
+
+/* Style riêng cho nút "Mở khóa" (màu xanh) */
+.user-table .unlock-btn {
+    background-color: #2ecc71; /* Màu xanh tương tự tag "Hoạt động" */
+}
+
+.user-table .unlock-btn:hover {
+    background-color: #27ae60; /* Màu xanh đậm hơn */
 }
