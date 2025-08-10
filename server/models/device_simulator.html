@@ -71,7 +71,6 @@
     const btnIcon = toggleBtn.querySelector('.icon');
     const btnText = toggleBtn.querySelector('span');
 
-    // ⚠️ QUAN TRỌNG: Thay đổi URL này thành IP của máy tính của bạn
     const SERVER_URL = 'http://192.168.0.104:5000';
 
     let watchId = null;
@@ -81,7 +80,7 @@
         const logEntry = document.createElement('div');
         logEntry.className = `log-${type}`;
         logEntry.textContent = `[${time}] ${message}`;
-        logContainer.prepend(logEntry); // Thêm log mới lên đầu
+        logContainer.prepend(logEntry);
     }
 
     deviceIdInput.value = localStorage.getItem('lastDeviceId') || '';
@@ -145,7 +144,6 @@
 
         const options = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
 
-        // Dùng getCurrentPosition để kiểm tra quyền một lần trước
         navigator.geolocation.getCurrentPosition(
             (initialPosition) => {
                 log('Đã có quyền GPS. Bắt đầu theo dõi...', 'success');
@@ -156,10 +154,10 @@
                 toggleBtn.classList.add('active');
                 deviceIdInput.disabled = true;
                 updateStatus('Đang gửi vị trí...', 'success');
-                sendLocation(initialPosition); // Gửi vị trí đầu tiên ngay lập tức
+                sendLocation(initialPosition);
             },
             (error) => {
-                handleError(error); // Gọi hàm xử lý lỗi chung
+                handleError(error);
             },
             options
         );

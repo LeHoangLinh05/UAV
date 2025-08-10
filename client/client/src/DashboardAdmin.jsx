@@ -8,7 +8,6 @@ import L from 'leaflet';
 import { toast } from 'react-toastify';
 import 'leaflet-draw/dist/leaflet.draw.css';
 
-// Bản vá lỗi icon Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
@@ -18,7 +17,6 @@ L.Icon.Default.mergeOptions({
 
 const API_URL = 'http://localhost:5000/api';
 
-// Component helper để sửa lỗi render map
 function MapResizer() {
     const map = useMap();
     useEffect(() => {
@@ -43,12 +41,12 @@ export default function DashboardAdmin({ user, onLogout }) {
     const [users, setUsers] = useState([]);
     const [devices, setDevices] = useState([]);
     const [deviceTab, setDeviceTab] = useState('all');
-    const [noFlyZones, setNoFlyZones] = useState([]); // State cho vùng cấm
-    const [showAlertModal, setShowAlertModal] = useState(false); // State cho modal gửi tin nhắn
-    const [alertData, setAlertData] = useState(null); // Dữ liệu của vi phạm
-    const [alertMessage, setAlertMessage] = useState(''); // Nội dung tin nhắn
-    const [allNoFlyZones, setAllNoFlyZones] = useState([]); // State mới để lưu tất cả zone cho trang quản lý
-    const [editingZone, setEditingZone] = useState(null); // State cho modal chỉnh sửa zone
+    const [noFlyZones, setNoFlyZones] = useState([]);
+    const [showAlertModal, setShowAlertModal] = useState(false);
+    const [alertData, setAlertData] = useState(null);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [allNoFlyZones, setAllNoFlyZones] = useState([]);
+    const [editingZone, setEditingZone] = useState(null);
     const socketRef = useRef(null);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -58,8 +56,7 @@ export default function DashboardAdmin({ user, onLogout }) {
     const [selectedDeviceForMap, setSelectedDeviceForMap] = useState(null);
 
     useEffect(() => {
-        // --- PHẦN 1: KHỞI TẠO VÀ LẤY DỮ LIỆU BAN ĐẦU ---
-        // (Không liên quan đến socket)
+
         const fetchData = () => {
             Promise.all([
                 api.get('/admin/stats'),
@@ -77,14 +74,13 @@ export default function DashboardAdmin({ user, onLogout }) {
         };
         fetchData();
 
-        // --- PHẦN 2: THIẾT LẬP KẾT NỐI SOCKET VÀ LISTENERS ---
-        // Chỉ tạo kết nối MỘT LẦN
+
         const socket = io("http://localhost:5000");
         socketRef.current = socket;
 
         console.log(`[EFFECT] Socket instance created for user ${user.name}`);
 
-        // Định nghĩa các handler
+
         const handleConnect = () => {
             console.log(`[SOCKET] CONNECTED! ID: ${socket.id}. Joining rooms...`);
             socket.emit('joinRoom', { userId: user._id, userRole: user.role });
@@ -106,7 +102,7 @@ export default function DashboardAdmin({ user, onLogout }) {
                     <p style={{fontSize: '0.9em', marginTop: '5px'}}><em>Hệ thống đã tự động gửi cảnh báo đến người dùng.</em></p>
                 </div>,
                 {
-                    toastId: `admin-nfz-${data.deviceId}`, // Tránh lặp lại
+                    toastId: `admin-nfz-${data.deviceId}`,
                     autoClose: 10000 // Tự đóng sau 10s
                 }
             );
@@ -126,8 +122,6 @@ export default function DashboardAdmin({ user, onLogout }) {
             setDevices(prev => prev.map(d => d._id === data.deviceId ? { ...d, status: data.status } : d));
         });
 
-        // --- PHẦN 3: HÀM DỌN DẸP ---
-        // Hàm này sẽ chỉ chạy một lần khi component bị unmount (ví dụ: khi logout)
         return () => {
             console.log('[EFFECT CLEANUP] Component unmounting. Disconnecting socket.');
             socket.disconnect();
@@ -164,9 +158,9 @@ export default function DashboardAdmin({ user, onLogout }) {
         const formData = new FormData();
         formData.append('avatar', file);
         try {
-            // API endpoint để cập nhật avatar là chung cho mọi user, kể cả admin
+
             const res = await api.put(`/users/${user._id}/avatar`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-            // Gọi hàm onUserUpdate được truyền từ App.jsx
+
             onUserUpdate(res.data);
         } catch (err) {
             console.error('Lỗi khi cập nhật avatar:', err);
@@ -176,14 +170,10 @@ export default function DashboardAdmin({ user, onLogout }) {
 
     const handleLockDevice = async (id) => {
         try {
-            // Gọi API để khóa/mở khóa thiết bị
             await api.put(`${API_URL}/admin/devices/${id}/lock`);
-
-            // Cập nhật state 'devices' ngay lập tức để giao diện thay đổi
             setDevices(prevDevices =>
                 prevDevices.map(device => {
                     if (device._id === id) {
-                        // Đảo ngược trạng thái isLocked của thiết bị vừa được cập nhật
                         return { ...device, isLocked: !device.isLocked };
                     }
                     return device;
@@ -197,14 +187,10 @@ export default function DashboardAdmin({ user, onLogout }) {
 
     const handleLockUser = async (id) => {
         try {
-            // Gọi API để khóa/mở khóa người dùng
             await api.put(`${API_URL}/admin/users/${id}/lock`);
-
-            // Cập nhật state 'users' ngay lập tức để giao diện thay đổi
             setUsers(prevUsers =>
                 prevUsers.map(u => {
                     if (u._id === id) {
-                        // Đảo ngược trạng thái isLocked của người dùng vừa được cập nhật
                         return { ...u, isLocked: !u.isLocked };
                     }
                     return u;
@@ -220,7 +206,7 @@ export default function DashboardAdmin({ user, onLogout }) {
         setSelectedUserForHistory(user);
         setShowHistoryModal(true);
         setIsHistoryLoading(true);
-        setUserFlightHistory([]); // Xóa lịch sử cũ
+        setUserFlightHistory([]);
 
         try {
             const res = await api.get(`/admin/users/${user._id}/history`);
@@ -241,9 +227,7 @@ export default function DashboardAdmin({ user, onLogout }) {
         const redOptions = { color: 'red', fillColor: '#f03e3e', fillOpacity: 0.2 };
 
         return (
-            // Thêm một class mới cho container cha để định vị
             <div className="overview-container">
-                {/* 1. Phần bản đồ làm nền */}
                 <div className="overview-map-background">
                     <MapContainer center={[21.0285, 105.8542]} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false} attributionControl={false}>
                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -267,12 +251,11 @@ export default function DashboardAdmin({ user, onLogout }) {
                             );
                         })}
                         {Array.isArray(noFlyZones) && noFlyZones.map(zone => {
-                            // Kiểm tra kỹ lưỡng các thuộc tính cần thiết trước khi render
                             if (zone.shape === 'Circle' && zone.center && typeof zone.center.lat === 'number' && typeof zone.center.lng === 'number' && typeof zone.radius === 'number') {
                                 return (
                                     <Circle
                                         key={`nfz-${zone._id}`}
-                                        center={[zone.center.lat, zone.center.lng]} // Đảm bảo truyền vào một mảng
+                                        center={[zone.center.lat, zone.center.lng]}
                                         radius={zone.radius}
                                         pathOptions={redOptions}
                                     >
@@ -284,9 +267,8 @@ export default function DashboardAdmin({ user, onLogout }) {
                                 );
                             }
                             if (zone.shape === 'Polygon' && Array.isArray(zone.path) && zone.path.length > 0) {
-                                // Tạo một mảng tọa độ hợp lệ cho Polygon
                                 const validPath = zone.path.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number').map(p => [p.lat, p.lng]);
-                                if (validPath.length > 2) { // Một đa giác cần ít nhất 3 điểm
+                                if (validPath.length > 2) {
                                     return (
                                         <Polygon
                                             key={`nfz-${zone._id}`}
@@ -301,14 +283,11 @@ export default function DashboardAdmin({ user, onLogout }) {
                                     );
                                 }
                             }
-                            return null; // Luôn trả về null nếu điều kiện không khớp
+                            return null;
                         })}
                     </MapContainer>
                 </div>
-
-                {/* 2. Phần nội dung nổi lên trên, bao gồm cả tiêu đề và các thẻ thống kê */}
                 <div className="overview-content-overlay">
-                    {/*<h2>Tổng quan hệ thống</h2>*/}
                     <div className="stats-grid">
                         <StatCard title="Tổng người dùng" value={stats.userCount || 0} icon="👤" />
                         <StatCard title="Tổng thiết bị" value={stats.deviceCount || 0} icon="🚁" />
@@ -322,13 +301,10 @@ export default function DashboardAdmin({ user, onLogout }) {
 
     const renderDeviceManagement = () => {
         const lockedDevices = devices.filter(d => d.isLocked);
-        // const devicesToList = deviceTab === 'locked' ? lockedDevices : devices;
         const activeDevices = devices.filter(d => d.status === 'Đang hoạt động');
         const inactiveDevices = devices.filter(d => d.status !== 'Đang hoạt động');
-
         let devicesToList;
 
-        // 3. Sử dụng switch-case để chọn danh sách dựa trên `deviceTab` state
         switch (deviceTab) {
             case 'active':
                 devicesToList = activeDevices;
@@ -370,9 +346,9 @@ export default function DashboardAdmin({ user, onLogout }) {
                                 <p><strong>Trạng thái:</strong> {device.status}</p>
                                 <div className="card-actions">
                                     <button
-                                        className="action-btn view-btn" // Thêm class mới để tạo style
+                                        className="action-btn view-btn"
                                         onClick={() => setSelectedDeviceForMap(device)}
-                                        disabled={!device.location?.lat} // Chỉ bật khi có tọa độ
+                                        disabled={!device.location?.lat}
                                     >
                                         Xem vị trí
                                     </button>
@@ -420,7 +396,7 @@ export default function DashboardAdmin({ user, onLogout }) {
                             </button>
                         </td>
                         <td>
-                            {/* Thay đổi chính nằm ở thẻ button dưới đây */}
+
                             <button
                                 onClick={() => handleLockUser(u._id)}
                                 className={`action-btn ${u.isLocked ? 'unlock-btn' : 'lock-btn'}`}
@@ -437,13 +413,12 @@ export default function DashboardAdmin({ user, onLogout }) {
 
     const renderNfzManagement = () => {
         const handleCreate = async (e) => {
-            // e.layerType là 'circle', e.layer là đối tượng circle vừa vẽ
             if (e.layerType === 'circle') {
                 const { lat, lng } = e.layer.getLatLng();
                 const radius = e.layer.getRadius();
 
                 const name = prompt("Nhập tên cho vùng cấm mới:", "Vùng cấm mới");
-                if (!name) return; // Người dùng hủy
+                if (!name) return;
 
                 const newZoneData = {
                     name,
@@ -517,19 +492,19 @@ export default function DashboardAdmin({ user, onLogout }) {
                                 onCreated={handleCreate}
                                 draw={{
                                     rectangle: false,
-                                    polygon: false, // Tạm thời tắt polygon cho đơn giản
+                                    polygon: false,
                                     polyline: false,
                                     marker: false,
                                     circlemarker: false
                                 }}
                                 edit={{
-                                    featureGroup: new L.FeatureGroup(), // Tắt chức năng sửa hình dạng trực tiếp
+                                    featureGroup: new L.FeatureGroup(),
                                     edit: false,
                                     remove: false
                                 }}
                             />
                         </FeatureGroup>
-                        {/* Hiển thị các vùng đã có */}
+
                         {allNoFlyZones.map(zone => (
                             <Circle
                                 key={zone._id}
@@ -543,7 +518,7 @@ export default function DashboardAdmin({ user, onLogout }) {
                     </MapContainer>
                 </div>
 
-                {/* Modal chỉnh sửa */}
+
                 {editingZone && (
                     <div className="modal-overlay">
                         <div className="modal-content">
@@ -637,7 +612,7 @@ export default function DashboardAdmin({ user, onLogout }) {
                     <div className="map-content">
                         <h3>Vị trí hiện tại của {selectedDeviceForMap.name}</h3>
                         <MapContainer
-                            key={selectedDeviceForMap._id} // Dùng key để re-render map khi đổi thiết bị
+                            key={selectedDeviceForMap._id}
                             center={[selectedDeviceForMap.location.lat, selectedDeviceForMap.location.lng]}
                             zoom={15}
                             style={{ height: '450px', width: '100%' }}
@@ -657,7 +632,7 @@ export default function DashboardAdmin({ user, onLogout }) {
 
             {showHistoryModal && selectedUserForHistory && (
                 <div className="modal-overlay">
-                    <div className="modal-content modal-lg"> {/* Thêm class modal-lg để rộng hơn */}
+                    <div className="modal-content modal-lg">
                         <h3>Lịch sử bay của {selectedUserForHistory.name}</h3>
 
                         <div className="history-modal-list">

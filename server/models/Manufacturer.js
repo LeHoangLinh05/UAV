@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 const manufacturerSchema = new mongoose.Schema({
-    name: { type: String, required: true, unique: true }, // Ví dụ: "DJI", "Veeniix Robotics"
+    name: { type: String, required: true, unique: true },
     website: String,
     supportContact: String,
 });

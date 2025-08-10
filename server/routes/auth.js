@@ -5,7 +5,6 @@ const User = require('../models/User');
 const router = express.Router();
 
 
-// Đăng ký
 router.post('/register', async (req, res) => {
   const { name, email, password, role } = req.body;
   const existingUser = await User.findOne({ email });
@@ -17,7 +16,6 @@ router.post('/register', async (req, res) => {
   res.json({ msg: 'Đăng ký thành công' });
 });
 
-// Đăng nhập
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });

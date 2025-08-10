@@ -225,15 +225,15 @@
 
 .device-card-content h3 {
     margin-top: 0;
-    margin-bottom: 0.5rem; /* Khoảng cách dưới h3 */
+    margin-bottom: 0.5rem;
     font-size: 1.3rem;
     color: #2c3e50;
     font-weight: 700;
 }
 
 .device-card-content p {
-    margin-top: 0.25rem; /* Khoảng cách nhỏ trên mỗi dòng p */
-    margin-bottom: 0.25rem; /* Khoảng cách nhỏ dưới mỗi dòng p */
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
     font-size: 0.95rem;
     color: #555;
     line-height: 1.4;
@@ -245,7 +245,7 @@
 .card-actions {
     display: flex;
     gap: 10px;
-    margin-top: 1.5rem; /* ✅ KHOẢNG CÁCH CỐ ĐỊNH giữa text và nút */
+    margin-top: 1.5rem;
 }
 
 .card-actions button {

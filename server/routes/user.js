@@ -6,24 +6,18 @@ const multer = require('multer'); // ✅ Import multer
 const path = require('path');     // ✅ Import path
 const fs = require('fs');         // ✅ Import fs để xóa file cũ
 
-// ✅ Cấu hình Multer để lưu file
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadPath = path.join(__dirname, '../uploads');
-        // Không cần kiểm tra tồn tại thư mục ở đây vì file device.js đã làm rồi
         cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
-        // Tạo tên file duy nhất để tránh trùng lặp
         const uniqueName = `avatar-${Date.now()}-${file.originalname}`;
         cb(null, uniqueName);
     }
 });
 const upload = multer({ storage });
 
-
-// ✅ TẠO ROUTE MỚI ĐỂ UPLOAD AVATAR
-// PUT /api/users/:id/avatar
 router.put('/:id/avatar', upload.single('avatar'), async (req, res) => {
     try {
         if (!req.file) {
@@ -47,11 +41,8 @@ router.put('/:id/avatar', upload.single('avatar'), async (req, res) => {
             }
         }
 
-        // Cập nhật đường dẫn avatar mới
         user.avatar = `/uploads/${req.file.filename}`;
         await user.save();
-
-        // Trả về thông tin user đã được cập nhật
         res.json({
             _id: user._id,
             name: user.name,
@@ -65,7 +56,6 @@ router.put('/:id/avatar', upload.single('avatar'), async (req, res) => {
         res.status(500).json({ error: 'Lỗi server khi upload avatar.' });
     }
 });
-// Cập nhật tên người dùng
 router.put('/:id', async (req, res) => {
     try {
         const { name } = req.body;
@@ -80,7 +70,6 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Đổi mật khẩu
 router.put('/:id/password', async (req, res) => {
     try {
         const { current, new: newPassword } = req.body;

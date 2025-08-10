@@ -12,7 +12,6 @@ const adminOnly = (req, res, next) => {
     }
 };
 
-// GET: Lấy tất cả các vùng cấm (kể cả active và inactive cho admin quản lý)
 router.get('/all', authMiddleware, adminOnly, async (req, res) => {
     try {
         const zones = await NoFlyZone.find().sort({ createdAt: -1 });
@@ -22,7 +21,6 @@ router.get('/all', authMiddleware, adminOnly, async (req, res) => {
     }
 });
 
-// GET: Lấy tất cả các vùng cấm đang hoạt động (cho user và map)
 router.get('/', async (req, res) => {
     try {
         const zones = await NoFlyZone.find({ isActive: true });
@@ -32,7 +30,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-// POST: Tạo một vùng cấm mới (chỉ admin)
 router.post('/', authMiddleware, adminOnly, async (req, res) => {
     try {
         const newZone = new NoFlyZone(req.body);
@@ -43,7 +40,6 @@ router.post('/', authMiddleware, adminOnly, async (req, res) => {
     }
 });
 
-// PUT: Cập nhật một vùng cấm (chỉ admin) - THÊM ROUTE NÀY
 router.put('/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
         const { name, description, isActive } = req.body;
@@ -60,7 +56,6 @@ router.put('/:id', authMiddleware, adminOnly, async (req, res) => {
 });
 
 
-// DELETE: Xóa một vùng cấm (chỉ admin)
 router.delete('/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
         await NoFlyZone.findByIdAndDelete(req.params.id);

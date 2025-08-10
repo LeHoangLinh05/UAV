@@ -92,7 +92,6 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
         }
     }, [activeTab, devices, historyFetched]);
 
-    // Các hàm xử lý modal và form
     const handleOpenAddModal = () => {
         setNewDevice({ name: '', deviceId: '', modelId: '', image: null });
         setSelectedManufacturer('');
@@ -163,7 +162,6 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
         }
     };
     const handleOpenEditModal = (device) => {
-        // Sao chép thông tin thiết bị và thêm trường `newImage` để xử lý file ảnh mới
         setEditingDevice({ ...device, newImage: null });
         setShowEditModal(true);
     };
@@ -190,7 +188,6 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
             const res = await api.put(`/devices/${editingDevice._id}`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            // Cập nhật lại danh sách thiết bị trên giao diện
             setDevices(prev => prev.map(d => (d._id === res.data._id ? res.data : d)));
             alert('Cập nhật thiết bị thành công!');
             handleCloseEditModal();
@@ -204,31 +201,6 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
 
     return (
         <div className="dashboard-layout">
-            {/*<div className="sidebar">*/}
-            {/*    <div className="user-info">*/}
-            {/*        <label htmlFor="avatar-upload">*/}
-            {/*            <img*/}
-            {/*                src={`http://localhost:5000${user.avatar}`}*/}
-            {/*                alt="avatar"*/}
-            {/*                className="avatar"*/}
-            {/*            />*/}
-            {/*        </label>*/}
-            {/*        <input*/}
-            {/*            id="avatar-upload"*/}
-            {/*            type="file"*/}
-            {/*            accept="image/*"*/}
-            {/*            onChange={handleAvatarChange}*/}
-            {/*            style={{ display: 'none' }}*/}
-            {/*        />*/}
-            {/*        <div className="username">{user?.name || 'Người dùng'}</div>*/}
-            {/*    </div>*/}
-            {/*    <nav className="menu-vertical">*/}
-            {/*        <button className={activeTab === 'devices' ? 'active' : ''} onClick={() => setActiveTab('devices')}>Thiết bị của tôi</button>*/}
-            {/*        <button className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}>Lịch sử bay</button>*/}
-            {/*        <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>Cài đặt</button>*/}
-            {/*        <button onClick={onLogout} className="logout-button">Đăng xuất</button>*/}
-            {/*    </nav>*/}
-            {/*</div>*/}
             <div className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
                 <div className="user-info">
                     <label htmlFor="avatar-upload">
@@ -260,7 +232,6 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
                     </button>
                 </nav>
 
-                {/* Nút thu gọn */}
                 <button className="collapse-btn" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}>
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" /></svg>
                 </button>
@@ -277,7 +248,7 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
                                         onClick={() => handleOpenEditModal(device)}
                                         aria-label={`Sửa thiết bị ${device.name}`} // Tốt cho accessibility
                                     >
-                                        {/* Đây là icon "cây bút chì" SVG */}
+
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
                                             <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
@@ -337,8 +308,6 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
                 {activeTab === 'settings' && (
                     <div className="settings-tab">
                         <h2>Cài đặt tài khoản</h2>
-
-                        {/* --- Card Đổi tên người dùng --- */}
                         <div className="settings-card">
                             <h3>Thông tin cá nhân</h3>
                             <p className="card-description">Tên này sẽ được hiển thị trên hồ sơ của bạn.</p>
@@ -417,21 +386,20 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
                 )}
             </div>
 
-            {/* -------------------- SECTION THAY ĐỔI CHÍNH -------------------- */}
-            {/* Modal bản đồ được nâng cấp toàn diện */}
+
             {selectedDevice && (
                 <div className="map-modal">
                     <div className="map-content">
                         <h3>{selectedDevice.name} - {viewingFlight ? 'Lịch sử chuyến bay' : 'Vị trí hiện tại'}</h3>
                         <MapContainer
                             key={selectedDevice._id + (viewingFlight ? viewingFlight._id : '')}
-                            // NEW: Tâm bản đồ động
+
                             center={
                                 viewingFlight && viewingFlight.path.length > 0
                                     ? [viewingFlight.path[0].lat, viewingFlight.path[0].lng] // Lấy tâm là điểm bắt đầu của lịch sử
                                     : [selectedDevice.location.lat, selectedDevice.location.lng] // Lấy tâm là vị trí hiện tại
                             }
-                            zoom={15} // Zoom to hơn để thấy rõ
+                            zoom={15}
                             style={{ height: '450px', width: '100%' }}
                         >
                             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -443,7 +411,7 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
                                         <Popup><b>VÙNG CẤM:</b> {zone.name}</Popup>
                                     </Circle>
                                 }
-                                return null; // Tương tự cho Polygon nếu cần
+                                return null;
                             })}
 
                             {/* --- CASE 1: Đang xem lịch sử chuyến bay --- */}
@@ -479,13 +447,13 @@ export default function DashboardUser({ user, onLogout, onUserUpdate }) {
                             )}
                         </MapContainer>
 
-                        {/* NEW: Nút đóng sẽ reset cả 2 state */}
+
                         <button onClick={() => { setSelectedDevice(null); setViewingFlight(null); }} className="close-map">Đóng</button>
                     </div>
                 </div>
             )}
 
-            {/* Add Device Modal không đổi */}
+
             {showAddModal && (
                 <div className="modal-overlay">
                     <div className="modal-content">
