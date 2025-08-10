@@ -7,6 +7,7 @@ const Device = require('../models/Device'); // Cần model Device mới
 const FlightSession = require('../models/FlightSession');
 const axios = require('axios');
 const authMiddleware = require('../middleware/auth');
+const NoFlyZone = require('../models/NoFlyZone');
 
 // Lưu ảnh vào thư mục "uploads/"
 const storage = multer.diskStorage({
@@ -66,7 +67,37 @@ const getAddressFromCoordinates = async (lat, lng) => {
     }
 };
 
+function getDistance(point1, point2) {
+    const R = 6371e3; // Bán kính Trái Đất (mét)
+    const φ1 = point1.lat * Math.PI / 180;
+    const φ2 = point2.lat * Math.PI / 180;
+    const Δφ = (point2.lat - point1.lat) * Math.PI / 180;
+    const Δλ = (point2.lng - point1.lng) * Math.PI / 180;
 
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+}
+
+function isPointInCircle(point, center, radius) {
+    return getDistance(point, center) <= radius;
+}
+
+// Hàm kiểm tra điểm trong đa giác (Ray-casting algorithm)
+function isPointInPolygon(point, polygon) {
+    const { lat, lng } = point;
+    let isInside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].lng, yi = polygon[i].lat;
+        const xj = polygon[j].lng, yj = polygon[j].lat;
+        const intersect = ((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+        if (intersect) isInside = !isInside;
+    }
+    return isInside;
+}
 
 
 // ✅ TẠO ROUTE MỚI: LẤY LỊCH SỬ BAY CỦA 1 THIẾT BỊ
@@ -89,6 +120,47 @@ router.delete('/:id', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Không thể xóa thiết bị' });
+    }
+});
+
+router.put('/:id', authMiddleware, upload.single('image'), async (req, res) => {
+    try {
+        const { name } = req.body;
+        const device = await Device.findById(req.params.id);
+
+        if (!device) {
+            return res.status(404).json({ error: 'Không tìm thấy thiết bị' });
+        }
+
+        // Kiểm tra quyền sở hữu
+        if (device.owner.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Bạn không có quyền sửa thiết bị này' });
+        }
+
+        // Cập nhật tên
+        if (name) {
+            device.name = name;
+        }
+
+        // Cập nhật ảnh nếu có file mới được tải lên
+        if (req.file) {
+            // Xóa ảnh cũ nếu không phải ảnh mặc định
+            const defaultImagePath = '/uploads/default-device.png';
+            if (device.image && device.image !== defaultImagePath) {
+                const oldImagePath = path.join(__dirname, '..', device.image);
+                if (fs.existsSync(oldImagePath)) {
+                    fs.unlinkSync(oldImagePath);
+                }
+            }
+            device.image = `/uploads/${req.file.filename}`;
+        }
+
+        const updatedDevice = await device.save();
+        res.json(updatedDevice);
+
+    } catch (err) {
+        console.error('Lỗi khi cập nhật thiết bị:', err);
+        res.status(500).json({ error: 'Lỗi server khi cập nhật thiết bị.' });
     }
 });
 
@@ -123,7 +195,6 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
     }
 });
 
-// ✅ CẬP NHẬT LẠI ROUTE GET CỦA USER
 router.get('/', authMiddleware, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -184,16 +255,16 @@ router.post('/ingress', async (req, res) => {
 router.post('/location', async (req, res) => {
     try {
         const { deviceId, lat, lng } = req.body;
+        // ... code cũ để tìm và cập nhật device, session không đổi ...
         if (!deviceId || lat == null || lng == null) {
             return res.status(400).json({ error: 'Thiếu thông tin.' });
         }
 
-        const device = await Device.findOne({ deviceId: deviceId });
+        const device = await Device.findOne({ deviceId: deviceId }).populate('owner', '_id'); // Lấy cả owner id
         if (!device) return res.status(404).json({ error: 'Không tìm thấy thiết bị.' });
 
         const wasInactive = (device.status === 'Không hoạt động' || device.status === 'Chờ kết nối');
 
-        // Cập nhật thông tin cơ bản của thiết bị
         device.location = { lat, lng };
         device.status = 'Đang hoạt động';
         device.lastHeartbeat = new Date();
@@ -202,35 +273,71 @@ router.post('/location', async (req, res) => {
         let currentSession;
 
         if (wasInactive) {
-            // --- BẮT ĐẦU CHUYẾN BAY MỚI ---
-            console.log(`Bắt đầu chuyến bay mới cho thiết bị ${deviceId}`);
             const startAddress = await getAddressFromCoordinates(lat, lng);
-            currentSession = new FlightSession({
-                deviceId: device._id,
-                startTime: new Date(),
-                path: [{ lat, lng }],
-                startAddress: startAddress
-            });
+            currentSession = new FlightSession({ deviceId: device._id, startTime: new Date(), path: [{ lat, lng }], startAddress: startAddress });
         } else {
-            // --- CẬP NHẬT CHUYẾN BAY HIỆN TẠI ---
             currentSession = await FlightSession.findOne({ deviceId: device._id, endTime: { $exists: false } });
             if (currentSession) {
                 currentSession.path.push({ lat, lng });
             } else {
-                // Trường hợp hiếm gặp: không tìm thấy session, tạo mới
                 const startAddress = await getAddressFromCoordinates(lat, lng);
-                currentSession = new FlightSession({
-                    deviceId: device._id, startTime: new Date(), path: [{ lat, lng }], startAddress
-                });
+                currentSession = new FlightSession({ deviceId: device._id, startTime: new Date(), path: [{ lat, lng }], startAddress });
             }
         }
         await currentSession.save();
 
-        // Gửi tín hiệu WebSocket như cũ
         const io = req.app.get('socketio');
-        io.emit('deviceLocationUpdate', {
-            deviceId: device._id, location: device.location, status: device.status
-        });
+        io.emit('deviceLocationUpdate', { deviceId: device._id, location: device.location, status: device.status });
+
+
+        const zones = await NoFlyZone.find({ isActive: true });
+        for (const zone of zones) {
+            let isInZone = false;
+            const currentPoint = { lat, lng };
+
+            if (zone.shape === 'Circle' && isPointInCircle(currentPoint, zone.center, zone.radius)) {
+                isInZone = true;
+            } else if (zone.shape === 'Polygon' && isPointInPolygon(currentPoint, zone.path)) {
+                isInZone = true;
+            }
+
+            if (isInZone) {
+                console.log(`CẢNH BÁO: Thiết bị ${device.name} đã đi vào vùng cấm ${zone.name}`);
+
+                // 1. Dữ liệu cảnh báo cho Admin
+                const breachDataForAdmin = {
+                    deviceName: device.name,
+                    deviceId: device._id,
+                    ownerName: device.owner?.name || 'Không xác định', // Thêm tên chủ sở hữu
+                    zoneName: zone.name,
+                    zoneId: zone._id,
+                    timestamp: new Date()
+                };
+
+                // Gửi cảnh báo đến tất cả admin
+                io.to('admins').emit('nfzBreach', breachDataForAdmin);
+
+                // 2. Tự động tạo và gửi tin nhắn cảnh báo đến User
+                if (device.owner?._id) {
+                    const autoMessage = `Hệ thống tự động phát hiện thiết bị "${device.name}" của bạn đã đi vào vùng cấm bay "${zone.name}". Yêu cầu di chuyển thiết bị ra khỏi khu vực này ngay lập tức để đảm bảo an toàn và tuân thủ quy định.`;
+
+                    const messageDataForUser = {
+                        sender: 'Hệ thống tự động',
+                        message: autoMessage,
+                        deviceName: device.name,
+                        zoneName: zone.name,
+                        timestamp: new Date()
+                    };
+
+                    // Gửi tin nhắn bằng sự kiện 'admin:messageReceived'
+                    io.to(device.owner._id.toString()).emit('admin:messageReceived', messageDataForUser);
+                    console.log(`Đã tự động gửi cảnh báo đến người dùng ${device.owner.name} (ID: ${device.owner._id})`);
+                }
+
+                // Chúng ta chỉ cần cảnh báo một lần cho vị trí hiện tại nên dùng break
+                break;
+            }
+        }
 
         res.json({ message: 'Cập nhật vị trí thành công.' });
     } catch (err) {

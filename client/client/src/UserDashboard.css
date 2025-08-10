@@ -1,0 +1,333 @@
+/* === UserDashboard.css === */
+
+/* Layout tổng */
+.dashboard-layout {
+    display: flex;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+/* Sidebar bên trái */
+.sidebar {
+    width: 240px;
+    background-color: #1e1e2f;
+    color: white;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Thông tin người dùng */
+.user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 2rem;
+}
+
+.avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    margin-bottom: 10px;
+    border: 3px solid #3a3a5a;
+    transition: transform 0.2s ease;
+}
+.avatar:hover {
+    transform: scale(1.05);
+}
+
+.username {
+    margin-top: 5px;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+/* Menu dọc */
+.menu-vertical {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+    flex-grow: 1;
+}
+
+.menu-vertical button {
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    padding: 15px;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.menu-vertical button:hover {
+    background-color: #2e2e4d;
+    color: white;
+}
+.menu-vertical button.active {
+    background-color: #007bff;
+    color: white;
+    font-weight: bold;
+}
+
+/* Nút đăng xuất */
+.logout-button {
+    background: none;
+    border: none;
+    color: #ff6b6b;
+    padding: 15px;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    margin-top: auto;
+}
+.logout-button:hover {
+    background-color: rgba(255, 107, 107, 0.1);
+}
+
+/* Nội dung chính bên phải */
+.main-content {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+    background-color: #f4f6f9;
+}
+
+/* --- MODALS --- */
+.modal-overlay, .map-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content, .map-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    width: 450px;
+    max-width: 95%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+.map-content {
+    width: 90%;
+    max-width: 600px;
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    color: #2c3e50;
+}
+.modal-content label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #34495e;
+    font-size: 0.9rem;
+}
+.modal-content input[type="text"],
+.modal-content input[type="file"],
+.modal-content select,
+.modal-content textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-sizing: border-box;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 1.5rem;
+}
+.modal-actions button, .close-map {
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+.modal-actions button:hover { transform: translateY(-2px); }
+.modal-actions button[type="submit"] { background-color: #007bff; color: white; }
+.modal-actions button[type="submit"]:hover { background-color: #0069d9; }
+.modal-actions button[type="button"], .close-map { background-color: #e9ecef; color: #495057; }
+.modal-actions button[type="button"]:hover, .close-map:hover { background-color: #dae0e5; }
+.close-map {
+    margin-top: 15px;
+    float: right;
+}
+
+
+/* --- DEVICE LIST --- */
+.device-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 2rem;
+    align-items: start; /* Giữ lại để các card căn lề trên */
+}
+
+.device-card {
+    position: relative;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.07);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.device-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+.device-card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+}
+
+.device-card-content {
+    padding: 1.25rem;
+}
+
+.device-info-group {
+}
+
+.device-card-content h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem; /* Khoảng cách dưới h3 */
+    font-size: 1.3rem;
+    color: #2c3e50;
+    font-weight: 700;
+}
+
+.device-card-content p {
+    margin-top: 0.25rem; /* Khoảng cách nhỏ trên mỗi dòng p */
+    margin-bottom: 0.25rem; /* Khoảng cách nhỏ dưới mỗi dòng p */
+    font-size: 0.95rem;
+    color: #555;
+    line-height: 1.4;
+}
+.device-card-content p strong {
+    color: #2c3e50;
+}
+
+.card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 1.5rem; /* ✅ KHOẢNG CÁCH CỐ ĐỊNH giữa text và nút */
+}
+
+.card-actions button {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background-color 0.2s, transform 0.1s ease;
+}
+
+.card-actions button:active {
+    transform: scale(0.97);
+}
+
+.card-actions .button-primary { background-color: #007bff; }
+.card-actions .button-primary:hover { background-color: #0069d9; }
+.card-actions .button-danger { background-color: #dc3545; }
+.card-actions .button-danger:hover { background-color: #c82333; }
+.device-card.add-card {
+    justify-content: center;
+    align-items: center;
+    border: 2px dashed #ced4da;
+    color: #6c757d;
+    cursor: pointer;
+    min-height: 350px;
+}
+.plus-icon { font-size: 48px; margin-bottom: 10px; }
+
+/* --- SETTINGS TAB --- */
+.settings-tab { max-width: 800px; margin: 0 auto; padding: 1rem; }
+.settings-tab h2 { font-size: 2rem; color: #2c3e50; margin-bottom: 2rem; border-bottom: 2px solid #ecf0f1; padding-bottom: 1rem; }
+.settings-card { background-color: #ffffff; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
+.settings-card h3 { font-size: 1.5rem; color: #34495e; margin: 0 0 0.5rem 0; }
+.settings-card .card-description { font-size: 0.95rem; color: #7f8c8d; margin-bottom: 1.5rem; }
+.settings-card form label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #34495e; font-size: 0.9rem; }
+.settings-card form input[type="text"], .settings-card form input[type="password"] { width: 100%; padding: 12px 15px; border: 1px solid #bdc3c7; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem; box-sizing: border-box; }
+.settings-card .form-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+.settings-card form button[type="submit"] { background-color: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 1rem; }
+
+/* --- HISTORY TAB --- */
+.history-tab { padding: 1rem; }
+.history-tab h2 { font-size: 2rem; color: #2c3e50; margin-bottom: 2rem; border-bottom: 2px solid #ecf0f1; padding-bottom: 1rem; }
+.history-list { display: flex; flex-direction: column; gap: 1.5rem; }
+.history-item { background-color: #ffffff; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07); display: flex; justify-content: space-between; align-items: center; }
+.history-item-info h3 { margin: 0 0 0.5rem 0; color: #34495e; font-size: 1.25rem; }
+.history-item-info p { margin: 0.25rem 0; color: #7f8c8d; font-size: 0.9rem; }
+.history-item-actions button { background-color: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.history-item-actions button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+/* --- EDIT ICON --- */
+.edit-icon-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.75);
+    border: none;
+    padding: 0;
+    margin: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    backdrop-filter: blur(2px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.edit-icon-button:hover,
+.edit-icon-button:focus {
+    background: white;
+    transform: scale(1.1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.edit-icon-button svg {
+    width: 18px;
+    height: 18px;
+    fill: #333;
+}

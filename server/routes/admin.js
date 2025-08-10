@@ -111,5 +111,36 @@ router.delete('/devices/:id', async (req, res) => {
     }
 });
 
+router.get('/users/:id/history', async (req, res) => {
+    try {
+        const userId = req.params.id;
+
+        // 1. Tìm tất cả các thiết bị thuộc sở hữu của người dùng này
+        const userDevices = await Device.find({ owner: userId }).select('_id');
+
+        // Nếu người dùng không có thiết bị nào, trả về mảng rỗng
+        if (!userDevices || userDevices.length === 0) {
+            return res.json([]);
+        }
+
+        // 2. Lấy ra một mảng chỉ chứa các ID của thiết bị
+        const deviceIds = userDevices.map(d => d._id);
+
+        // 3. Tìm tất cả các phiên bay có deviceId nằm trong mảng deviceIds
+        const flightHistory = await FlightSession.find({
+            deviceId: { $in: deviceIds }
+        })
+            .populate('deviceId', 'name') // Lấy cả tên của thiết bị liên quan
+            .sort({ startTime: -1 }); // Sắp xếp chuyến bay mới nhất lên đầu
+
+        res.json(flightHistory);
+
+    } catch (err) {
+        console.error("Lỗi khi lấy lịch sử bay của người dùng:", err);
+        res.status(500).json({ msg: 'Lỗi server' });
+    }
+});
+
+
 
 module.exports = router;

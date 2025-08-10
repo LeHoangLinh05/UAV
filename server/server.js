@@ -11,6 +11,7 @@ const { Server } = require("socket.io");
 const cron = require('node-cron');      // ✅ SỬA LỖI 1: Import node-cron
 const axios = require('axios');
 
+
 // Đăng ký tất cả các model với Mongoose
 require('./models');
 
@@ -20,7 +21,7 @@ const deviceRoutes = require('./routes/device');
 const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
 const manufacturerRoutes = require('./routes/manufacturer');
-
+const nfzRoutes = require('./routes/nfz');
 // --- 2. KHỞI TẠO & CẤU HÌNH ---
 dotenv.config();
 const app = express();
@@ -124,10 +125,37 @@ app.use('/api/devices', deviceRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/manufacturers', manufacturerRoutes);
+app.use('/api/nfz', nfzRoutes);
 
 // Sự kiện Socket.IO
 io.on('connection', (socket) => {
     console.log('Một client đã kết nối:', socket.id);
+
+    // Client gửi thông tin user khi kết nối
+    socket.on('joinRoom', ({ userId, userRole }) => {
+        if (userId) {
+            socket.join(userId); // Mỗi user có 1 phòng riêng
+            console.log(`[Socket.IO] Client ${socket.id} (User ID: ${userId}) đã tham gia phòng "${userId}".`);
+        }
+        if (userRole === 'admin') {
+            socket.join('admins'); // Tất cả admin tham gia phòng chung 'admins'
+            console.log(`[Socket.IO] Client ${socket.id} (Role: ${userRole}) đã tham gia phòng "admins".`);
+        }
+    });
+
+    // Admin gửi tin nhắn đến 1 user cụ thể
+    socket.on('admin:sendMessageToUser', ({ targetUserId, message, deviceName, zoneName }) => {
+        // Gửi tin nhắn đến phòng của user đó
+        io.to(targetUserId).emit('admin:messageReceived', {
+            sender: 'Quản trị viên',
+            message,
+            deviceName,
+            zoneName,
+            timestamp: new Date()
+        });
+        console.log(`Admin đã gửi tin nhắn đến user ${targetUserId}`);
+    });
+
     socket.on('disconnect', () => {
         console.log('Client đã ngắt kết nối:', socket.id);
     });
