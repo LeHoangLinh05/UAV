@@ -39,7 +39,6 @@ npm install
 ```
 
 ```bash
-# 5. Khởi chạy server
 node server.js
 ```
 
