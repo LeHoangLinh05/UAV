@@ -1,5 +1,3 @@
-// File: models/FlightSession.js
-
 const mongoose = require('mongoose');
 
 const flightSessionSchema = new mongoose.Schema({
@@ -19,6 +17,10 @@ const flightSessionSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+
+    startAddress: { type: String, default: 'Đang xác định...' },
+    endAddress: { type: String, default: 'Chưa kết thúc' },
+
     // Lưu lại một mảng các tọa độ [lat, lng]
     path: [{
         lat: Number,
