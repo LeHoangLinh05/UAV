@@ -30,7 +30,7 @@
 *   **MongoDB**: Đã cài đặt và đang chạy trên máy, hoặc có chuỗi kết nối từ MongoDB Atlas.
 *   **Git**
 
-### 1. Cài đặt Backend (API Server)
+### 1. Cài đặt API Server
 
 ```bash
 git clone <URL_REPO_BACKEND> server
@@ -53,7 +53,7 @@ MONGO_URI=mongodb://localhost:27017/uav-management
 node server.js
 ```
 
-### 2. Cài đặt Frontend (Giao diện React + Vite)
+### 2. Cài đặt Giao diện React + Vite
 ```bash
 git clone <URL_REPO_FRONTEND> client
 cd client
