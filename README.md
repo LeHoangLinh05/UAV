@@ -38,16 +38,6 @@ cd server
 npm install
 ```
 
-**4. Tạo file `.env` để cấu hình biến môi trường**
-
-Tạo một file mới tên là `.env` trong thư mục `server` và sao chép nội dung bên dưới vào.
-
-**Nội dung file `.env`:**
-```dotenv
-PORT=5000
-MONGO_URI=mongodb://localhost:27017/uav-management
-```
-
 ```bash
 # 5. Khởi chạy server
 node server.js
