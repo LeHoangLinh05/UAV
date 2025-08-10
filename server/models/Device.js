@@ -1,5 +1,4 @@
 // backend/models/Device.js
-
 const mongoose = require('mongoose');
 
 const deviceSchema = new mongoose.Schema({

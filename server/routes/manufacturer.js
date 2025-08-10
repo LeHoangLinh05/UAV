@@ -1,13 +1,9 @@
 // backend/routes/manufacturer.js
-
 const express = require('express');
 const router = express.Router();
 const Manufacturer = require('../models/Manufacturer');
 const DeviceModel = require('../models/DeviceModel');
 
-// --- API CHO NGƯỜI DÙNG ---
-
-// GET /api/manufacturers - Lấy danh sách tất cả các hãng
 router.get('/', async (req, res) => {
     try {
         const manufacturers = await Manufacturer.find().sort({ name: 1 });
@@ -17,7 +13,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET /api/manufacturers/:id/models - Lấy các model của một hãng cụ thể
 router.get('/:id/models', async (req, res) => {
     try {
         const models = await DeviceModel.find({ manufacturer: req.params.id }).sort({ modelName: 1 });
@@ -28,9 +23,6 @@ router.get('/:id/models', async (req, res) => {
 });
 
 
-// --- API CHO ADMIN (để quản lý, có thể phát triển sau) ---
-
-// POST /api/manufacturers - Tạo hãng mới (dành cho admin)
 router.post('/', async (req, res) => {
     try {
         const newManufacturer = new Manufacturer({ name: req.body.name, website: req.body.website });
@@ -41,7 +33,6 @@ router.post('/', async (req, res) => {
     }
 });
 
-// POST /api/manufacturers/models - Tạo model mới cho hãng (dành cho admin)
 router.post('/models', async (req, res) => {
     try {
         const newModel = new DeviceModel({

@@ -47,18 +47,15 @@ export default function App() {
   const handleLogout = () => {
     setIsLoggedIn(false);
     setUser(null);
-    localStorage.removeItem('token'); // Nên xóa token khi logout
+    localStorage.removeItem('token');
   };
 
   const handleUserUpdate = (updatedUserData) => {
     setUser(prevUser => ({ ...prevUser, ...updatedUserData }));
   };
 
-  // ✅ CẤU TRÚC MỚI ĐỂ SỬA LỖI
   return (
       <>
-        {/* 1. Đặt ToastContainer ở đây, bên ngoài tất cả logic điều kiện.
-             Nó sẽ luôn tồn tại trong ứng dụng. */}
         <ToastContainer
             position="top-right"
             autoClose={8000}
@@ -72,16 +69,16 @@ export default function App() {
             theme="light"
         />
 
-        {/* 2. Sử dụng toán tử 3 ngôi để render nội dung chính */}
+
         {isLoggedIn ? (
-            // Nếu đã đăng nhập
+
             user.role === 'admin' ? (
                 <DashboardAdmin user={user} onLogout={handleLogout} />
             ) : (
                 <DashboardUser user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} />
             )
         ) : (
-            // Nếu chưa đăng nhập
+
             <div className="app-container">
               <video autoPlay loop muted className="background-video">
                 <source src="/videos/bg.mp4" type="video/mp4" />

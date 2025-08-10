@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const flightSessionSchema = new mongoose.Schema({
     deviceId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Device', // Liên kết tới model Device
+        ref: 'Device',
         required: true
     },
     startTime: {
@@ -25,7 +25,7 @@ const flightSessionSchema = new mongoose.Schema({
     path: [{
         lat: Number,
         lng: Number,
-        _id: false // Không cần _id cho mỗi điểm tọa độ
+        _id: false
     }]
 }, { timestamps: true });
 

@@ -7,7 +7,6 @@ const api = axios.create({
 
 api.interceptors.request.use(
     (config) => {
-        // Thêm log ở đây để chắc chắn interceptor được thiết lập
         console.log('Interceptor is set up. Attaching token...');
         const token = localStorage.getItem('token');
         if (token) {
