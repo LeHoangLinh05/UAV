@@ -1,0 +1,27 @@
+services:
+  frontend:
+    build: ./client/client
+    ports:
+      - "3000:80"   # React được build ra và chạy trên Nginx
+    depends_on:
+      - backend
+
+  backend:
+    build: ./server
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/drone-db
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:6
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
